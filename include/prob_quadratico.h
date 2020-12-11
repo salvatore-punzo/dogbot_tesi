@@ -26,7 +26,7 @@ using namespace std;
 class PROB_QUAD{
     public:
         PROB_QUAD();
-        void CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, double &z_com, double &dz_com, Matrix<double,6,1> &q_joints_base, Matrix<double,6,1> &q_joints_des_base, int &id, double &step);
+        void CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, double &z_com,double &dz_com, Matrix<double,6,1> &composdes);
         //get function
         vector<double> getTau();
 

@@ -20,11 +20,14 @@
 #include "quadruped.h"
 #include "prob_quadratico.h"
 #include "poligono_supporto.h"
+#include "traj_planner.h"
 
 
 using namespace Eigen;
 using namespace std;
-using namespace alglib;
+//using namespace alglib;
+
+// Variabili globali
 
 bool update = false;
 
@@ -55,12 +58,13 @@ Matrix<double, 18,1> q_joints_total;
 Matrix<double, 18,1> dq_joints_total;
 Matrix<double,6,1> floating_base_pose;
 Matrix<double,6,1> floating_base_posed;
+Matrix<double,3,1> floating_base_orientation;
 double com_zdes = 0.4;
-
+bool joint_state_available = false, joint_base_available = false;
 
 void Joint_cb(sensor_msgs::JointStateConstPtr js){
-
 	update = true;
+	joint_state_available = true;
 	//memo pitch e hip coincidono
 	hp<<js->position[1],js->position[4],js->position[7],js->position[10]; //rispettivamente bl,br,fl,fr
 	he<<js->effort[1],js->effort[4],js->effort[7],js->effort[10];
@@ -140,7 +144,7 @@ void VCom_cb(geometry_msgs::TwistStampedConstPtr data){
 }
 
 void vbody_cb(geometry_msgs::TwistStampedConstPtr vj){
-	
+	joint_base_available = true;
 	Vector3d vl_floating_base;
 	Vector3d va_floating_base;
 	
@@ -153,10 +157,11 @@ void vbody_cb(geometry_msgs::TwistStampedConstPtr vj){
 }
 
 void modelState_cb(gazebo_msgs::ModelStatesConstPtr pt){
-
+	//prendi la velocità da questo topic e non da vbody
+	//joint_state_available = true;
 	double roll, pitch, yaw;
 	double yaw_eu, pitch_eu, roll_eu;
-	Matrix<double,3,1> floating_base_orientation;
+	
 	tf::Quaternion q(pt->pose[2].orientation.x, pt->pose[2].orientation.y, pt->pose[2].orientation.z, pt->pose[2].orientation.w);
 	floating_base_position<<pt->pose[2].position.x, pt->pose[2].position.y, pt->pose[2].position.z;
 	
@@ -175,12 +180,25 @@ void modelState_cb(gazebo_msgs::ModelStatesConstPtr pt){
 	floating_base_orientation<< roll_eu, pitch_eu, yaw_eu;
 	q_joints_total<<floating_base_position, floating_base_orientation, q_joints;
 	floating_base_pose<< floating_base_position, floating_base_orientation;
-	
+	floating_base_posed<<floating_base_pose[0], floating_base_pose[1],com_zdes, floating_base_pose[3],floating_base_pose[4],floating_base_pose[5];
+
 }
 
 int main(int argc, char **argv){
 	string modelFile="/home/salvatore/ros_ws/src/DogBotV4/ROS/src/dogbot_description/urdf/dogbot.urdf";
+	     
 	
+cout<<"prova"<<endl;
+	double ti=0.0, tf=1.0, t=0.0;
+	
+	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
+	
+	init_pos = floating_base_pose;
+	end_pos = floating_base_posed;
+
+	init_vel = Matrix<double,6,1>::Zero();
+	init_vel = end_vel = init_acc = end_acc;
+
 	CIN_DIR  *leglength; //va bene dichiarata in questa parte del codice?
 	leglength = new CIN_DIR;
 
@@ -192,6 +210,12 @@ int main(int argc, char **argv){
 
 	POLI_SUP *poligono_sup;
 	poligono_sup = new POLI_SUP;
+
+	TrajPlanner *traiettoria;
+	traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
+
+	trajectory_point traj;
+     traj = traiettoria->getTraj();
 	
 	ros::init(argc, argv, "ros_main");
 
@@ -210,90 +234,93 @@ int main(int argc, char **argv){
 	
 	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",10);
 	ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",10);
+	ros::ServiceClient pauseGazebo = n.serviceClient<std_srvs::Empty>("/gazebo/pause_physics");
+		 while(!joint_state_available && !joint_base_available )
+    {
+        ROS_INFO_STREAM_ONCE("Robot/object state not available yet.");
+        ROS_INFO_STREAM_ONCE("Please start gazebo simulation.");
+        ros::spinOnce();
+    }
 	
-	//ros::ServiceClient pauseGazebo = n.serviceClient<std_srvs::Empty>("/gazebo/pause_physics");
-	
+	//pause gazebo
+cout<<"prova"<<endl;
 	
 	ros::Rate rate(1000);
-	int id;
-		//ros::time::now() < 3 al posto di ros::ok
-	while( ros::ok()){
-		//metto ciclo for per traiettoria
-		double dist = com_zdes - floating_base_position[2];
-		double step = dist/1000;
-		std_msgs::Float64 msg;
-		
-		
-		for(id=0;id<1000;id++){
-		ros::spinOnce();
-		_errore_pub.publish(msg);
+	std_msgs::Float64 msg;
 
-		if(update==true){
+		// initial simulation time 
+     ros::Time begin = ros::Time::now();
+     ROS_INFO_STREAM_ONCE("Starting control loop ...");
 
-			dist = com_zdes - floating_base_position[2];
-			msg.data=dist;
-			
-			leglength->calculate_leg_length_cb(hp, kp);
-			VectorXd ll = leglength->getLegLength();
-			/*
-			cout<<"leglength: "<<endl<<ll<<endl;
-			cout<<"hp: "<<endl<<hp<<endl;
-			cout<<"he: "<<endl<<he<<endl;
-			cout<<"coordinate ee bl: "<<endl<<coo_ee_bl<<endl;
-			*/
-			poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
-			
-			/*
-			cout<<"world_H_base"<<endl<<world_H_base<<endl;
-			cout<<"basevel"<<endl<<basevel<<endl;
-			cout<<"q_joints"<<endl<<q_joints<<endl;
-			cout<<"dq_joints"<<endl<<dq_joints<<endl;
-			cout<<"gravity1"<<endl<<gravity1<<endl;
-			*/
-			doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
-			
-			VectorXd b=doggo->getBiasMatrix();
-			Matrix<double,18,18> M=doggo->getMassMatrix();
-			Matrix<double,24,18> Jc=doggo->getJacobian();
-			Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
-			Matrix<double,18,18> T=doggo->getTransMatrix();
-			Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
-			
-			//cout<<"b:"<<endl<<b<<endl;
-			floating_base_posed<<floating_base_pose[0], floating_base_pose[1],com_zdes, floating_base_pose[3],floating_base_pose[4],floating_base_pose[5];
-			
-		/*
+	  while ((ros::Time::now()-begin).toSec() < tf-0.001)
+    { 
+		//prendo punto della traiettorie nell'ista desi 
+	cout<<"update: "<<update<<endl;
+	cout<<"joint_state_available: "<<joint_state_available<<endl;
+			if(update==true && joint_state_available==true && joint_base_available==true){
 
-			double t=0;
-			while(t = (ros::Time::now()).toSec() < 3){
-    		cout<<"tempo_simulazione:"<<t<<endl;
+				// Time
+         		t = (ros::Time::now()-begin).toSec();
+         		int idx= std::round( t*1000);
+				//Calcolo vettori desiderati
+				Matrix<double,6,1> composdes, comveldes, comaccdes;
+				composdes<<traj.pos(0,idx), traj.pos(1,idx), traj.pos(2,idx), 0,  0, 0;
+				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx), 0,  0, 0;
+				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx), 0,  0, 0;
+cout<<"prova2"<<endl;
+				//Calcolo lunghezza gamba fisica
+				leglength->calculate_leg_length_cb(hp, kp);
+				VectorXd ll = leglength->getLegLength();
+				/*
+				cout<<"leglength: "<<endl<<ll<<endl;
+				cout<<"hp: "<<endl<<hp<<endl;
+				cout<<"he: "<<endl<<he<<endl;
+				cout<<"coordinate ee bl: "<<endl<<coo_ee_bl<<endl;
+				*/
+				poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
+			
+				/*
+				cout<<"world_H_base"<<endl<<world_H_base<<endl;
+				cout<<"basevel"<<endl<<basevel<<endl;
+				cout<<"q_joints"<<endl<<q_joints<<endl;
+				cout<<"dq_joints"<<endl<<dq_joints<<endl;
+				cout<<"gravity1"<<endl<<gravity1<<endl;
+				*/
+				doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+			
+				VectorXd b=doggo->getBiasMatrix();
+				Matrix<double,18,18> M=doggo->getMassMatrix();
+				Matrix<double,24,18> Jc=doggo->getJacobian();
+				Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
+				Matrix<double,18,18> T=doggo->getTransMatrix();
+				Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
+			
+				//cout<<"b:"<<endl<<b<<endl;
+		cout<<"prova3"<<endl;
+				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total,floating_base_position[2],basevel[2],composdes,comveldes);
+				vector<double> tau = ottim->getTau();
+				//--------------------pubblico le coppie calcolate --------------------
+				std_msgs::Float64MultiArray msg_ctrl;
+			cout<<"prova4"<<endl;
+
+				// set up dimensions
+				msg_ctrl.layout.dim.push_back(std_msgs::MultiArrayDimension());
+				msg_ctrl.layout.dim[0].size = tau.size();
+				msg_ctrl.layout.dim[0].stride = 1;
+				msg_ctrl.layout.dim[0].label = "x"; // or whatever name you typically use to index vec1
+
+				// copy in the data
+				msg_ctrl.data.clear();
+				msg_ctrl.data.insert(msg_ctrl.data.end(), tau.begin(), tau.end());
+				//stampa tau e controlla anche il topic command
+				_tau_pub.publish(msg_ctrl);
+				
+			
+
 			}
-         */
+			ros::spinOnce();
+			//pu publi stepper
 		
-			ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total,floating_base_position[2],basevel[2],floating_base_pose, floating_base_posed,id,step);
-			vector<double> tau = ottim->getTau();
-			//--------------------pubblico le coppie calcolate --------------------
-			std_msgs::Float64MultiArray msg;
-			
-
-			// set up dimensions
-			msg.layout.dim.push_back(std_msgs::MultiArrayDimension());
-			msg.layout.dim[0].size = tau.size();
-			msg.layout.dim[0].stride = 1;
-			msg.layout.dim[0].label = "x"; // or whatever name you typically use to index vec1
-
-			// copy in the data
-			msg.data.clear();
-			msg.data.insert(msg.data.end(), tau.begin(), tau.end());
-			
-			_tau_pub.publish(msg);
-			
-			
-
-		}//chiudo il ciclo for
-		update=false;
-		
-		}
 		//calcolo poligono(lunghezza gamba)
 		
 	}

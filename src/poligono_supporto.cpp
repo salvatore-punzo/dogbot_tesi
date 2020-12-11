@@ -82,6 +82,7 @@ void POLI_SUP::calcoloPoligonoSupporto(VectorXd &ll, VectorXd &hp, VectorXd &he,
 	eef_vb_rlz =_ee_f_vb_rl.transpose() * sele_z;
 	eef_vb_llz =_ee_f_vb_ll.transpose() * sele_z;
 
+//cop calcolato come nel cap 48 dell'Handbook
 	cop_x = (eef_vb_rlz * xc_vb_rl + eef_vb_llz * xc_vb_ll)/(eef_vb_rlz+ eef_vb_llz);
 	cop_y = (eef_vb_rlz * yc_vb_rl + eef_vb_llz * yc_vb_ll)/(eef_vb_rlz+ eef_vb_llz);
 /*

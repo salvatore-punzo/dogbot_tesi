@@ -6,16 +6,9 @@ PROB_QUAD::PROB_QUAD(){
    
 };
 
-void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, double &z_com,double &dz_com, Matrix<double,6,1> &q_joints_base, Matrix<double,6,1> &q_joints_des_base, int &id, double &step){
+void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, double &z_com,double &dz_com, Matrix<double,6,1> &composdes){
 //cout<<"What a wonderful day!"<<endl;
-//---------------------- traiettoria 1/1 ---------------------------
-	Matrix<double,6,1> prova = Matrix<double,6,1>::Zero();
- 	TrajPlanner *traiettoria;
-	traiettoria = new TrajPlanner(0.0,3.0,q_joints_base,q_joints_des_base,prova, prova, prova, prova);
-	trajectory_point traj;
-     traj = traiettoria->getTraj();
 
-	
 //Jacobian task 1
 	Jt1<<Matrix<double,1,18>::Zero(),
 		Matrix<double,1,18>::Zero(),
@@ -74,12 +67,11 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	
 	
 	Matrix<double,37,44> A;
-//------------------------------------------------ traiettoria 2/2 ----------------
-	
-      int size=3*1000;//(tf-ti) * 1000 ---> questo dovrebbe essere il secondo indice di traj.pos
 
-		e<<0,0,z_com-z_com+id*step;//traj.pos(2);//com_zdes; //posizione corrente dei giunti della floating base - posizione desiderata
-		e_dot<<0,0,dz_com; //velocità corrente asse z
+	
+     
+		e<<0,0,z_com-composdes[2];//posizione corrente dei giunti della floating base - posizione desiderata
+		e_dot<<0,0,dz_com; //velocità corrente asse z to do metti velocità desiderata
 	
 	A<<M,Jc_T_B,S_T,Matrix<double,18,1>::Zero(),-b,
 		B_T_Jc, Matrix<double,12,25>::Zero(),B.transpose()*Jcdqd,
@@ -124,8 +116,8 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	}
 	//Vincoli sulle accelerazioni
 	for(int i = 6; i<18; i++){
-		bndl(i)=fp_neginf;//(2/pow(Dt,2)) * (qmin(i-6)-q_joints_total(i)- Dt * dq_joints_total(i));// fp_neginf;//-INFINITY
-		bndu(i)=fp_posinf;//(2/pow(Dt,2)) * (qmax(i-6)-q_joints_total(i)- Dt * dq_joints_total(i));// fp_posinf;//+INFINITY
+		bndl(i)=(2/pow(Dt,2)) * (qmin(i-6)-q_joints_total(i)- Dt * dq_joints_total(i));// fp_neginf;//-INFINITY
+		bndu(i)=(2/pow(Dt,2)) * (qmax(i-6)-q_joints_total(i)- Dt * dq_joints_total(i));// fp_posinf;//+INFINITY
 	}
 	//Vincoli sulle forze di contatto
 	for(int i = 18; i<30; i++){
@@ -140,7 +132,13 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 
 	bndl(42)= fp_neginf;//-Infinity
 	bndu(42)= fp_posinf;//+Infinity
-
+for(int i = 6;i<18;i++){
+	cout<<"limite superiore sulle accelerazioni: "<<bndu(i)<<endl;
+	cout<<"limite inferiore sulle accelerazioni: "<<bndl(i)<<endl;
+	cout<<"q joints corrente "<<i<<": "<<q_joints_total(i)<<endl;
+	cout<<"qmax - qcorrente: "<<qmax(i-6)-q_joints_total(i)<<endl;
+	cout<<"qmin - qcorrente: "<<qmin(i-6)-q_joints_total(i)<<endl;
+}
 	
 	real_1d_array x;
 	minqpstate state;
@@ -167,7 +165,9 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	cout<<endl;
 
     tau = { x(30),x(40),x(41),x(31),x(38),x(39),x(33),x(34),x(35),x(32),x(36),x(37)};
-	
+	for(int i =0; i<12; i++){
+		cout<<"tau: "<<tau[11-i]<<endl;
+	}
 
 
 }
