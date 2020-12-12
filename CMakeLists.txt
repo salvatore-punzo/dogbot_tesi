@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
   std_msgs
   sensor_msgs
+  gazebo_ros
   gazebo_msgs
   geometry_msgs
   tf
@@ -22,6 +23,8 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Eigen3 REQUIRED)
 
 find_package(iDynTree REQUIRED)
+
+find_package( Gazebo REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -130,6 +133,11 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
 )
+include_directories(
+ ${GAZEBO_INCLUDE_DIRS}
+ ${GAZEBO_PROTO_INCLUDE_DIRS}
+ ${SDF_INCLUDE_DIRS}
+)
 
 ## Declare a C++ library
  add_library(${PROJECT_NAME}
@@ -190,7 +198,7 @@ src/alglib/specialfunctions.cpp
 #   ${catkin_LIBRARIES}
 # )
 #target_link_libraries(cin_diretta  ${catkin_LIBRARIES})
-target_link_libraries(main  ${catkin_LIBRARIES} ${iDynTree_LIBRARIES})
+target_link_libraries(main  ${catkin_LIBRARIES} ${iDynTree_LIBRARIES} ${GAZEBO_LIBRARIES})
 #############
 ## Install ##
 #############

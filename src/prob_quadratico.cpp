@@ -6,7 +6,7 @@ PROB_QUAD::PROB_QUAD(){
    
 };
 
-void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, double &z_com,double &dz_com, Matrix<double,6,1> &composdes){
+void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, double &z_com,double &dz_com, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes){
 //cout<<"What a wonderful day!"<<endl;
 
 //Jacobian task 1
@@ -71,7 +71,7 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	
      
 		e<<0,0,z_com-composdes[2];//posizione corrente dei giunti della floating base - posizione desiderata
-		e_dot<<0,0,dz_com; //velocità corrente asse z to do metti velocità desiderata
+		e_dot<<0,0,dz_com-comveldes[2]; //velocità corrente asse z to do metti velocità desiderata
 	
 	A<<M,Jc_T_B,S_T,Matrix<double,18,1>::Zero(),-b,
 		B_T_Jc, Matrix<double,12,25>::Zero(),B.transpose()*Jcdqd,

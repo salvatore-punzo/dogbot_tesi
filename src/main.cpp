@@ -3,6 +3,13 @@
 #include <std_msgs/Float64.h>
 #include <iostream>
 #include <stdlib.h>
+
+#include <gazebo/gazebo.hh>
+//#include <gazebo/gazebo_client.hh>
+//#include <gazebo/common/Plugin.hh>
+//#include <gazebo/msgs/msgs.hh>
+#include <gazebo/transport/transport.hh>
+
 #include "sensor_msgs/JointState.h"
 #include "gazebo_msgs/ContactsState.h"
 #include "gazebo_msgs/ModelStates.h"
@@ -15,6 +22,7 @@
 #include "eigen3/Eigen/Geometry"
 #include "eigen3/Eigen/Core"
 #include "eigen3/Eigen/SVD"
+#include <std_srvs/Empty.h>
 #include <tf/tf.h>
 #include "cin_diretta.h" 
 #include "quadruped.h"
@@ -217,10 +225,12 @@ cout<<"prova"<<endl;
 	trajectory_point traj;
      traj = traiettoria->getTraj();
 	
-	ros::init(argc, argv, "ros_main");
-
-    
-    ros::NodeHandle _nh;
+	//Start node
+	ros::init(argc, argv, "ros_control_node");
+	ros::NodeHandle _nh;
+	// Gazebo node 
+     gazebo::transport::NodePtr node(new gazebo::transport::Node());
+     node->Init();
     
 	ros::Subscriber _jointstate_sub = _nh.subscribe ("/dogbot/joint_states", 10, &Joint_cb);
 	ros::Subscriber _eebl_sub = _nh.subscribe("/dogbot/back_left_contactsensor_state",10, &eebl_cb);
@@ -234,7 +244,17 @@ cout<<"prova"<<endl;
 	
 	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",10);
 	ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",10);
-	ros::ServiceClient pauseGazebo = n.serviceClient<std_srvs::Empty>("/gazebo/pause_physics");
+	ros::ServiceClient pauseGazebo = _nh.serviceClient<std_srvs::Empty>("/gazebo/pause_physics");
+		 
+	// Gazebo publisher in case the qp problem takes too long for the control loop
+      gazebo::transport::PublisherPtr pub = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
+      pub->WaitForConnection();
+      gazebo::msgs::WorldControl stepper;
+     // Set multi-step to requested iterations
+       stepper.set_step(1);
+//vedi se mettere qui la dedinizione del control signal
+	   std_srvs::Empty pauseSrv;
+		 
 		 while(!joint_state_available && !joint_base_available )
     {
         ROS_INFO_STREAM_ONCE("Robot/object state not available yet.");
@@ -243,6 +263,7 @@ cout<<"prova"<<endl;
     }
 	
 	//pause gazebo
+	pauseGazebo.call(pauseSrv);
 cout<<"prova"<<endl;
 	
 	ros::Rate rate(1000);
@@ -318,13 +339,16 @@ cout<<"prova2"<<endl;
 			
 
 			}
+			// One step in gazebo world ( to use if minqp problem takes too long for control loop)
+        	pub->Publish(stepper);
 			ros::spinOnce();
-			//pu publi stepper
+			
 		
-		//calcolo poligono(lunghezza gamba)
+		
 		
 	}
  //pase gazebo call
+ pauseGazebo.call(pauseSrv);
  	
 	
 	
