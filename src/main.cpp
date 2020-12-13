@@ -5,9 +5,9 @@
 #include <stdlib.h>
 
 #include <gazebo/gazebo.hh>
-//#include <gazebo/gazebo_client.hh>
-//#include <gazebo/common/Plugin.hh>
-//#include <gazebo/msgs/msgs.hh>
+#include <gazebo/gazebo_client.hh>
+#include <gazebo/common/Plugin.hh>
+#include <gazebo/msgs/msgs.hh>
 #include <gazebo/transport/transport.hh>
 
 #include "sensor_msgs/JointState.h"
@@ -24,6 +24,7 @@
 #include "eigen3/Eigen/SVD"
 #include <std_srvs/Empty.h>
 #include <tf/tf.h>
+#include "tf_conversions/tf_eigen.h"
 #include "cin_diretta.h" 
 #include "quadruped.h"
 #include "prob_quadratico.h"
@@ -37,7 +38,7 @@ using namespace std;
 
 // Variabili globali
 
-bool update = false;
+bool joint_state_available = false, joint_base_available = false;
 
 VectorXd hp(4);
 VectorXd kp(4);
@@ -68,11 +69,12 @@ Matrix<double,6,1> floating_base_pose;
 Matrix<double,6,1> floating_base_posed;
 Matrix<double,3,1> floating_base_orientation;
 double com_zdes = 0.4;
-bool joint_state_available = false, joint_base_available = false;
+
 
 void Joint_cb(sensor_msgs::JointStateConstPtr js){
-	update = true;
 	joint_state_available = true;
+	
+	
 	//memo pitch e hip coincidono
 	hp<<js->position[1],js->position[4],js->position[7],js->position[10]; //rispettivamente bl,br,fl,fr
 	he<<js->effort[1],js->effort[4],js->effort[7],js->effort[10];
@@ -99,9 +101,9 @@ void Joint_cb(sensor_msgs::JointStateConstPtr js){
 	float _rflv = js->velocity[8];
 	float _rfrv = js->velocity[11];
 */
-
-	q_joints << js->position[11], js->position[8], js->position[2], js->position[5], hp[1],  kp[1], hp[0],  kp[0] , hp[2], kp[2], hp[3], kp[3];
-	dq_joints << js->velocity[11], js->velocity[8], js->velocity[2], js->velocity[5], js->velocity[4],  js->velocity[3], js->velocity[1],  js->velocity[0] , js->velocity[7], js->velocity[6], js->velocity[10],  js->velocity[9];
+//vedi queste errore su q_joints
+	q_joints << js->position[11], js->position[8], js->position[2], js->position[5], js->position[4],  js->position[3], js->position[1],  js->position[0] , js->position[7], js->position[6], js->position[10], js->position[9];
+	dq_joints<< js->velocity[11], js->velocity[8], js->velocity[2], js->velocity[5], js->velocity[4],  js->velocity[3], js->velocity[1],  js->velocity[0] , js->velocity[7], js->velocity[6], js->velocity[10],  js->velocity[9];
 
 		
 }
@@ -151,44 +153,44 @@ void VCom_cb(geometry_msgs::TwistStampedConstPtr data){
 
 }
 
-void vbody_cb(geometry_msgs::TwistStampedConstPtr vj){
+
+
+void modelState_cb( const gazebo_msgs::ModelStates &pt){
 	joint_base_available = true;
-	Vector3d vl_floating_base;
-	Vector3d va_floating_base;
+	world_H_base.setIdentity();
 	
-
-	vl_floating_base << vj->twist.linear.x, vj->twist.linear.y, vj->twist.linear.z;
-	va_floating_base << vj->twist.angular.x, vj->twist.angular.y, vj->twist.angular.z;
-	//cout<<"velocità floating base lungo x"<<vl_floating_base[0]<<endl;
-	basevel << vj->twist.linear.x, vj->twist.linear.y, vj->twist.linear.z, vj->twist.angular.x, vj->twist.angular.y, vj->twist.angular.z;
-	dq_joints_total<<basevel,dq_joints;
-}
-
-void modelState_cb(gazebo_msgs::ModelStatesConstPtr pt){
-	//prendi la velocità da questo topic e non da vbody
-	//joint_state_available = true;
 	double roll, pitch, yaw;
-	double yaw_eu, pitch_eu, roll_eu;
-	
-	tf::Quaternion q(pt->pose[2].orientation.x, pt->pose[2].orientation.y, pt->pose[2].orientation.z, pt->pose[2].orientation.w);
-	floating_base_position<<pt->pose[2].position.x, pt->pose[2].position.y, pt->pose[2].position.z;
-	
+	//double yaw_eu, pitch_eu, roll_eu;
+
+	//quaternion
+	tf::Quaternion q(pt.pose[1].orientation.x, pt.pose[1].orientation.y, pt.pose[1].orientation.z, pt.pose[1].orientation.w);
+	Matrix<double,3,3> rot;
+    tf::matrixTFToEigen(tf::Matrix3x3(q),rot);
+
 	tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
-	tf::Matrix3x3(q).getEulerYPR(yaw_eu,pitch_eu,roll_eu);
-	
+	//tf::Matrix3x3(q).getEulerYPR(yaw_eu,pitch_eu,roll_eu);
+	/*
 	world_H_base << cos(yaw)*cos(pitch), cos(yaw)*sin(pitch)*sin(roll)-sin(yaw)*cos(roll), cos(yaw)*sin(pitch)*cos(roll) + sin(yaw)*sin(roll), floating_base_position[0],
 					sin(yaw)*cos(pitch), sin(yaw)*sin(pitch)*sin(roll)+cos(yaw)*cos(roll), sin(yaw)*sin(pitch)*cos(roll)-cos(yaw)*sin(roll), floating_base_position[1],
 					-sin(pitch), cos(pitch)*sin(roll), cos(pitch)*cos(roll), floating_base_position[2],
 					0, 0, 0, 1;
-
+*/
 	rot_world_virtual_base << cos(yaw)*cos(pitch), cos(yaw)*sin(pitch)*sin(roll)-sin(yaw)*cos(roll), cos(yaw)*sin(pitch)*cos(roll) + sin(yaw)*sin(roll),
 							sin(yaw)*cos(pitch), sin(yaw)*sin(pitch)*sin(roll)+cos(yaw)*cos(roll), sin(yaw)*sin(pitch)*cos(roll)-cos(yaw)*sin(roll),
 							-sin(pitch), cos(pitch)*sin(roll), cos(pitch)*cos(roll);
 
-	floating_base_orientation<< roll_eu, pitch_eu, yaw_eu;
+	
+	floating_base_position<<pt.pose[1].position.x, pt.pose[1].position.y, pt.pose[1].position.z;
+	basevel<<pt.twist[1].linear.x, pt.twist[1].linear.y, pt.twist[1].linear.z, pt.twist[1].angular.x, pt.twist[1].angular.y, pt.twist[1].angular.z;
+	dq_joints_total<<basevel,dq_joints;
+	floating_base_orientation<< roll, pitch, yaw;//roll_eu, pitch_eu, yaw_eu;
 	q_joints_total<<floating_base_position, floating_base_orientation, q_joints;
 	floating_base_pose<< floating_base_position, floating_base_orientation;
 	floating_base_posed<<floating_base_pose[0], floating_base_pose[1],com_zdes, floating_base_pose[3],floating_base_pose[4],floating_base_pose[5];
+
+	//Set transformation matrix
+    world_H_base.block(0,0,3,3)= rot;
+    world_H_base.block(0,3,3,1)= floating_base_pose.block(0,0,3,1);
 
 }
 
@@ -196,8 +198,8 @@ int main(int argc, char **argv){
 	string modelFile="/home/salvatore/ros_ws/src/DogBotV4/ROS/src/dogbot_description/urdf/dogbot.urdf";
 	     
 	
-cout<<"prova"<<endl;
-	double ti=0.0, tf=1.0, t=0.0;
+cout<<"prova0"<<endl;
+	double ti=0.0, tf=3.0, t=0.0;
 	
 	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
 	
@@ -228,33 +230,47 @@ cout<<"prova"<<endl;
 	//Start node
 	ros::init(argc, argv, "ros_control_node");
 	ros::NodeHandle _nh;
+	cout<<"prova00"<<endl;
 	// Gazebo node 
      gazebo::transport::NodePtr node(new gazebo::transport::Node());
      node->Init();
-    
-	ros::Subscriber _jointstate_sub = _nh.subscribe ("/dogbot/joint_states", 10, &Joint_cb);
-	ros::Subscriber _eebl_sub = _nh.subscribe("/dogbot/back_left_contactsensor_state",10, &eebl_cb);
-	ros::Subscriber _eebr_sub = _nh.subscribe("/dogbot/back_right_contactsensor_state",10, &eebr_cb);
-	ros::Subscriber _eefl_sub = _nh.subscribe("/dogbot/front_left_contactsensor_state",10, &eefl_cb);
-	ros::Subscriber _eefr_sub = _nh.subscribe("/dogbot/front_right_contactsensor_state",10, &eefr_cb);
-	ros::Subscriber _modelState_sub = _nh.subscribe("/gazebo/model_states", 10, &modelState_cb);
-	ros::Subscriber _com_sub = _nh.subscribe("/dogbot/cog",10 ,&Com_cb);
-	ros::Subscriber _vcom_sub = _nh.subscribe("/dogbot/v_cog",10, &VCom_cb);
-	ros::Subscriber _vbody_sub = _nh.subscribe("/dogbot/v_body",10, &vbody_cb);
+
+	// Rate
+      ros::Rate loop_rate(1000);
+      gazebo::client::setup(argc,argv);
+
+    cout<<"prova01"<<endl;
+	//Subscriber
+	ros::Subscriber _jointstate_sub = _nh.subscribe ("/dogbot/joint_states", 1, Joint_cb);
+	ros::Subscriber _eebl_sub = _nh.subscribe("/dogbot/back_left_contactsensor_state",1, eebl_cb);
+	ros::Subscriber _eebr_sub = _nh.subscribe("/dogbot/back_right_contactsensor_state",1, eebr_cb);
+	ros::Subscriber _eefl_sub = _nh.subscribe("/dogbot/front_left_contactsensor_state",1, eefl_cb);
+	ros::Subscriber _eefr_sub = _nh.subscribe("/dogbot/front_right_contactsensor_state",1, eefr_cb);
+	ros::Subscriber _modelState_sub = _nh.subscribe("/gazebo/model_states", 1, modelState_cb);
+	ros::Subscriber _com_sub = _nh.subscribe("/dogbot/cog",1 ,Com_cb);
+	ros::Subscriber _vcom_sub = _nh.subscribe("/dogbot/v_cog",1, VCom_cb);
 	
-	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",10);
-	ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",10);
+	//Publisher
+	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",1);
+	ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",1);
+	//Service 
 	ros::ServiceClient pauseGazebo = _nh.serviceClient<std_srvs::Empty>("/gazebo/pause_physics");
-		 
+		 cout<<"prova02"<<endl;
 	// Gazebo publisher in case the qp problem takes too long for the control loop
       gazebo::transport::PublisherPtr pub = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
+	  	cout<<"prova020"<<endl;
       pub->WaitForConnection();
+	  cout<<"prova021"<<endl;
       gazebo::msgs::WorldControl stepper;
      // Set multi-step to requested iterations
        stepper.set_step(1);
-//vedi se mettere qui la dedinizione del control signal
+	   cout<<"prova03"<<endl;
+
+	//Segnale di controllo
+	   std_msgs::Float64MultiArray msg_ctrl;
+
 	   std_srvs::Empty pauseSrv;
-		 
+		 cout<<"prova04"<<endl;
 		 while(!joint_state_available && !joint_base_available )
     {
         ROS_INFO_STREAM_ONCE("Robot/object state not available yet.");
@@ -266,8 +282,8 @@ cout<<"prova"<<endl;
 	pauseGazebo.call(pauseSrv);
 cout<<"prova"<<endl;
 	
-	ros::Rate rate(1000);
-	std_msgs::Float64 msg;
+	
+	
 
 		// initial simulation time 
      ros::Time begin = ros::Time::now();
@@ -276,9 +292,9 @@ cout<<"prova"<<endl;
 	  while ((ros::Time::now()-begin).toSec() < tf-0.001)
     { 
 		//prendo punto della traiettorie nell'ista desi 
-	cout<<"update: "<<update<<endl;
+	
 	cout<<"joint_state_available: "<<joint_state_available<<endl;
-			if(update==true && joint_state_available==true && joint_base_available==true){
+			if(joint_state_available==true && joint_base_available==true){
 
 				// Time
          		t = (ros::Time::now()-begin).toSec();
@@ -317,11 +333,16 @@ cout<<"prova2"<<endl;
 				Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
 			
 				//cout<<"b:"<<endl<<b<<endl;
-		cout<<"prova3"<<endl;
+				//stampo giunti che passo al controllo ottimo
+				for (int i=0; i<18; i++){
+					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
+					//cout<<"zcom: "<<floating_base_position[2]<<endl;
+					//cout<<"dzcom: "<<basevel[2]<<endl;
+				}
 				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total,floating_base_position[2],basevel[2],composdes,comveldes);
 				vector<double> tau = ottim->getTau();
 				//--------------------pubblico le coppie calcolate --------------------
-				std_msgs::Float64MultiArray msg_ctrl;
+				
 			cout<<"prova4"<<endl;
 
 				// set up dimensions
@@ -334,6 +355,10 @@ cout<<"prova2"<<endl;
 				msg_ctrl.data.clear();
 				msg_ctrl.data.insert(msg_ctrl.data.end(), tau.begin(), tau.end());
 				//stampa tau e controlla anche il topic command
+				for(int i =0; i<12; i++){
+					cout<<"tau: "<<tau[11-i]<<endl;
+				}
+				
 				_tau_pub.publish(msg_ctrl);
 				
 			

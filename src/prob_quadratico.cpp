@@ -132,6 +132,7 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 
 	bndl(42)= fp_neginf;//-Infinity
 	bndu(42)= fp_posinf;//+Infinity
+	/*
 for(int i = 6;i<18;i++){
 	cout<<"limite superiore sulle accelerazioni: "<<bndu(i)<<endl;
 	cout<<"limite inferiore sulle accelerazioni: "<<bndl(i)<<endl;
@@ -139,7 +140,7 @@ for(int i = 6;i<18;i++){
 	cout<<"qmax - qcorrente: "<<qmax(i-6)-q_joints_total(i)<<endl;
 	cout<<"qmin - qcorrente: "<<qmin(i-6)-q_joints_total(i)<<endl;
 }
-	
+	*/
 	real_1d_array x;
 	minqpstate state;
     minqpreport rep;
@@ -165,10 +166,11 @@ for(int i = 6;i<18;i++){
 	cout<<endl;
 
     tau = { x(30),x(40),x(41),x(31),x(38),x(39),x(33),x(34),x(35),x(32),x(36),x(37)};
+	/*
 	for(int i =0; i<12; i++){
 		cout<<"tau: "<<tau[11-i]<<endl;
 	}
-
+*/
 
 }
 //get function

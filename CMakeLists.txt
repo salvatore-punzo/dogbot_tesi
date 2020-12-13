@@ -15,6 +15,8 @@ find_package(catkin REQUIRED COMPONENTS
   gazebo_msgs
   geometry_msgs
   tf
+  tf_conversions
+  tf2_msgs
   roslib
   message_generation
   message_runtime

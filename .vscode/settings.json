@@ -61,6 +61,7 @@
         "set": "cpp",
         "string": "cpp",
         "string_view": "cpp",
-        "svd": "cpp"
+        "svd": "cpp",
+        "dense": "cpp"
     }
 }
