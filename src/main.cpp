@@ -33,7 +33,7 @@
 #include "prob_quadratico.h"
 #include "poligono_supporto.h"
 #include "traj_planner.h"
-#include "capture_point.h"
+//#include "capture_point.h"
 
 
 using namespace Eigen;
@@ -98,34 +98,51 @@ void Joint_cb(sensor_msgs::JointStateConstPtr js){
 		
 }
 
+//posizione del contatto e misura della forza
 void eebl_cb(gazebo_msgs::ContactsStateConstPtr eebl){
-	
-	eef_bl<<eebl->states[0].total_wrench.force.x,
-	eebl->states[0].total_wrench.force.y, eebl->states[0].total_wrench.force.z;
 
-	coo_ee_bl<<eebl->states[0].contact_positions[0].x, eebl->states[0].contact_positions[0].y, eebl->states[0].contact_positions[0].z;
+	if(eebl->states.empty()){ 
+	}
+	else{
+		eef_bl<<eebl->states[0].total_wrench.force.x,
+		eebl->states[0].total_wrench.force.y, eebl->states[0].total_wrench.force.z;
+
+		coo_ee_bl<<eebl->states[0].contact_positions[0].x, eebl->states[0].contact_positions[0].y, eebl->states[0].contact_positions[0].z;
+	}
 }
+//posizione del contatto e misura della forza
 void eebr_cb(gazebo_msgs::ContactsStateConstPtr eebr){
-	
-	eef_br<<eebr->states[0].total_wrench.force.x,
-	eebr->states[0].total_wrench.force.y, eebr->states[0].total_wrench.force.z;
 
-	coo_ee_br<<eebr->states[0].contact_positions[0].x, eebr->states[0].contact_positions[0].y,eebr->states[0].contact_positions[0].z;
+	if(eebr->states.empty()){
+	}
+	else{
+		eef_br<<eebr->states[0].total_wrench.force.x,
+		eebr->states[0].total_wrench.force.y, eebr->states[0].total_wrench.force.z;
+
+		coo_ee_br<<eebr->states[0].contact_positions[0].x, eebr->states[0].contact_positions[0].y,eebr->states[0].contact_positions[0].z;
+	}
 }
-
+//posizione del contatto e misura della forza
 void eefl_cb(gazebo_msgs::ContactsStateConstPtr eefl){
+	if(eefl->states.empty()){
+	}
+	else{
+		eef_fl<<eefl->states[0].total_wrench.force.x,
+		eefl->states[0].total_wrench.force.y, eefl->states[0].total_wrench.force.z;
 
-	eef_fl<<eefl->states[0].total_wrench.force.x,
-	eefl->states[0].total_wrench.force.y, eefl->states[0].total_wrench.force.z;
-
-	coo_ee_fl<< eefl->states[0].contact_positions[0].x, eefl->states[0].contact_positions[0].y, eefl->states[0].contact_positions[0].z;
+		coo_ee_fl<< eefl->states[0].contact_positions[0].x, eefl->states[0].contact_positions[0].y, eefl->states[0].contact_positions[0].z;
+	}
 }
+//posizione del contatto e misura della forza
 void eefr_cb(gazebo_msgs::ContactsStateConstPtr eefr){
-	
-	eef_fr<<eefr->states[0].total_wrench.force.x,
-	eefr->states[0].total_wrench.force.y, eefr->states[0].total_wrench.force.z;
+	if(eefr->states.empty()){
+	}
+	else{
+		eef_fr<<eefr->states[0].total_wrench.force.x,
+		eefr->states[0].total_wrench.force.y, eefr->states[0].total_wrench.force.z;
 
-	coo_ee_fr<<eefr->states[0].contact_positions[0].x,eefr->states[0].contact_positions[0].y, eefr->states[0].contact_positions[0].z;
+		coo_ee_fr<<eefr->states[0].contact_positions[0].x,eefr->states[0].contact_positions[0].y, eefr->states[0].contact_positions[0].z;
+	}
 }
 
 //posizione centro di massa
@@ -185,7 +202,7 @@ void modelState_cb( const gazebo_msgs::ModelStates &pt){
 int main(int argc, char **argv){
 	string modelFile="/home/salvatore/ros_ws/src/DogBotV4/ROS/src/dogbot_description/urdf/dogbot.urdf";
 
-	CIN_DIR  *leglength; //va bene dichiarata in questa parte del codice?
+	CIN_DIR  *leglength; 
 	leglength = new CIN_DIR;
 
 	QUADRUPED *doggo;
@@ -199,10 +216,10 @@ int main(int argc, char **argv){
 	
 	cout<<"prova0"<<endl;
 	TrajPlanner *traiettoria;
-
+/*
 	CAPTURE_POINT *cp;
 	cp = new CAPTURE_POINT;
-	
+	*/
 	
 	
 	//Start node
@@ -317,15 +334,16 @@ int main(int argc, char **argv){
 				// Time
          		t = (ros::Time::now()-begin).toSec();
          		int idx= std::round( t*1000);
-				//Calcolo vettori desiderati
-				Matrix<double,6,1> composdes, comveldes, comaccdes;
-				composdes<<traj.pos(0,idx), traj.pos(1,idx), traj.pos(2,idx), 0,  0, 0;
-				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx), 0,  0, 0;
+
+				//Calcolo vettori desiderati prendo solo la posizione e non l'orientamento
+				Matrix<double,3,1> composdes, comveldes, comaccdes;
+				composdes<<traj.pos(0,idx), traj.pos(1,idx), traj.pos(2,idx);
+				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx);
 				
-				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx), 0,  0, 0;
+				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx);
 
 				cout<<"com posizione desiderata:"<<endl<<composdes<<endl;
-				cout<<"com velocità desiderata:"<<endl<<composdes<<endl;
+				cout<<"com velocità desiderata:"<<endl<<comveldes<<endl;
 				
 				//Calcolo lunghezza gamba fisica
 				leglength->calculate_leg_length_cb(hp, kp);
@@ -352,10 +370,10 @@ int main(int argc, char **argv){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
 				}
 
-				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes);
+				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel);
 				vector<double> tau = ottim->getTau();
 
-				cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel);
+				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel);
 
 				//--------------------pubblico le coppie calcolate --------------------
 				
@@ -382,7 +400,9 @@ int main(int argc, char **argv){
 			}
 			// One step in gazebo world ( to use if minqp problem takes too long for control loop)
         	pub->Publish(stepper);
+			cout<<"stepper"<<endl;
 			ros::spinOnce();
+			cout<<"stepper2"<<endl;
 			
 		
 		

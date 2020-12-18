@@ -1,17 +1,17 @@
 #include "prob_quadratico.h"
-#include "traj_planner.h"
+//#include "traj_planner.h"
 
 using namespace std;
 PROB_QUAD::PROB_QUAD(){
    
 };
 
-void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes){
+void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,3,1> &composdes, Matrix<double,3,1> &comveldes, Vector3d &com_pos, Vector3d &com_vel){
 //cout<<"What a wonderful day!"<<endl;
 
 //Jacobian task 1
-	Jt1<<Matrix<double,1,18>::Zero(),
-		Matrix<double,1,18>::Zero(),
+	Jt1<<1,Matrix<double,1,17>::Zero(),
+		0,1, Matrix<double,1,16>::Zero(),
 		0,0,1,Matrix<double,1,15>::Zero();
 
 	Jt1_T<<Jt1 * T;
@@ -66,38 +66,41 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	real_2d_array c; 
 	
 	
-	Matrix<double,37,44> A;
+	Matrix<double,40,44> A;
 
 	
      
-		e<<0,0,q_joints_total[2] - composdes[2];//posizione corrente dei giunti della floating base - posizione desiderata
+		e<<com_pos - composdes;//posizione corrente - posizione desiderata
 		
-		e_dot<<0,0,dq_joints_total[2] - comveldes[2]; //velocità corrente asse z to do metti velocità desiderata
+		e_dot<<com_vel - comveldes; //velocità corrente asse z - velocità desiderata
 	//controlla i segni di kp e kd, controlla i segni della matrice A, verifica Jt1
 	
 	A<<M,Jc_T_B,-S_T,Matrix<double,18,1>::Zero(),-b,
 		B_T_Jc, Matrix<double,12,25>::Zero(),-B.transpose()*Jcdqd,
 		Matrix<double,4,18>::Zero(), Sn, Matrix<double,4,13>::Zero(),Matrix<double,4,1>::Zero(),
-		Jt1_T, Matrix<double,3,24>::Zero(),Matrix<double,3,1>::Ones(), -Jt1_Tdot_dq -kd*e_dot - kp * e;
-	
+		Jt1_T, Matrix<double,3,24>::Zero(),Matrix<double,3,1>::Ones(), -Jt1_Tdot_dq -kd*e_dot - kp * e,
+		Jt1_T, Matrix<double,3,24>::Zero(),-Matrix<double,3,1>::Ones(), -Jt1_Tdot_dq -kd*e_dot - kp * e;
 	//cout<<"A:"<<endl;
 	//cout<<A<<endl;
-	c.setlength(37,44);
-	c.setcontent(37,44, &A(0,0));
+	c.setlength(40,44);
+	c.setcontent(40,44, &A(0,0));
 
 	
 	
 
 	//parametro che imposta la tipologia del vincolo 
 	integer_1d_array ct;
-	ct.setlength(37);
+	ct.setlength(40);
 	for(int i = 0; i <30; i++){
 		ct(i) = 0;
 	}
 	for(int i = 30; i<37; i++){
 		ct(i) = 1;
 	}
-
+	//metti dis
+	for(int i = 37; i<40; i++){
+		ct(i) = -1;
+	}
 	//box constrain
 	real_1d_array bndl;
 	bndl.setlength(43);
@@ -107,7 +110,8 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	VectorXd qmax(12);
 	double dt=0.001;
 	double Dt=10*dt;
-    //controlla se l'ordine delle condizioni di qmin e qmax è giusto
+
+    //limiti della posizione dei giunti
 	qmin<<-1.7453,-1.7453,-1.7453,-1.7453,-3.14159265359,-0.02,-1.57079632679,-2.61795,-1.57079632679,-2.61795,-3.14159265359,-0.02;
 	qmax<<1.7453, 1.7453, 1.7453, 1.7453, 1.57079632679, 2.61795, 3.14159265359, 0.02, 3.14159265359, 0.02, 1.57079632679, 2.61795;
 	
@@ -132,7 +136,7 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 		bndu(i)= 60;
 	}
 
-	bndl(42)= fp_neginf;//-Infinity
+	bndl(42)= 0;//-Infinity
 	bndu(42)= fp_posinf;//+Infinity
 	/*
 for(int i = 6;i<18;i++){
