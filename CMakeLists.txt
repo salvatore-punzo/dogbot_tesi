@@ -149,6 +149,7 @@ src/poligono_supporto.cpp
 src/quadruped.cpp
 src/prob_quadratico.cpp
 src/traj_planner.cpp
+src/capture_point.cpp
 
 src/alglib/ap.cpp
 src/alglib/alglibinternal.cpp
@@ -175,6 +176,7 @@ src/poligono_supporto.cpp
 src/quadruped.cpp
 src/prob_quadratico.cpp
 src/traj_planner.cpp
+src/capture_point.cpp
 
 src/alglib/ap.cpp
 src/alglib/alglibinternal.cpp

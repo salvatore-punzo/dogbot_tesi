@@ -93,3 +93,31 @@ void POLI_SUP::calcoloPoligonoSupporto(VectorXd &ll, VectorXd &hp, VectorXd &he,
 }
 
 //GET FUNCTION
+
+//coefficiente angolare
+float POLI_SUP::getm(){
+
+    return m;
+}
+
+//intercetta verticale
+float POLI_SUP::getq_newn(){
+
+    return q_newn;
+}
+
+float POLI_SUP::getq_newp(){
+
+    return q_newp;
+}
+
+float POLI_SUP::getqr(){
+
+    return qr;
+}
+
+float POLI_SUP::getqs(){
+
+    return qs;
+}
+

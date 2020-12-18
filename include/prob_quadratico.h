@@ -26,7 +26,7 @@ using namespace std;
 class PROB_QUAD{
     public:
         PROB_QUAD();
-        void CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, double &z_com,double &dz_com, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes);
+        void CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes);
         //get function
         vector<double> getTau();
 
@@ -47,8 +47,8 @@ class PROB_QUAD{
 	int CT[37];
 	Vector3d e;
 	Vector3d e_dot;
-	double kp=25;
-	double kd=2*sqrt(kp);
+	Matrix3d kp = 25*MatrixXd::Identity(3,3);
+	Matrix3d kd = 10*MatrixXd::Identity(3,3); //2*sqrt(kp);
     double com_zdes = 0.4;
 
     vector<double> tau;

@@ -17,7 +17,9 @@
 #include "geometry_msgs/PointStamped.h"
 #include "geometry_msgs/TwistStamped.h"
 #include <math.h>
+
 #include "boost/thread.hpp"
+
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
 #include "eigen3/Eigen/Core"
@@ -25,50 +27,38 @@
 #include <std_srvs/Empty.h>
 #include <tf/tf.h>
 #include "tf_conversions/tf_eigen.h"
+
 #include "cin_diretta.h" 
 #include "quadruped.h"
 #include "prob_quadratico.h"
 #include "poligono_supporto.h"
 #include "traj_planner.h"
+#include "capture_point.h"
 
 
 using namespace Eigen;
 using namespace std;
-//using namespace alglib;
+
 
 // Variabili globali
 
 bool joint_state_available = false, joint_base_available = false;
 
-VectorXd hp(4);
-VectorXd kp(4);
-VectorXd he(4);
-VectorXd rp(4);
-
-Vector3d eef_bl;
-Vector3d eef_br;
-Vector3d eef_fl;
-Vector3d eef_fr;
-
-Vector3d coo_ee_bl;
-Vector3d coo_ee_br;
-Vector3d coo_ee_fl;
-Vector3d coo_ee_fr;
-
+VectorXd hp(4), kp(4), he(4), rp(4);
+Vector3d eef_bl, eef_br, eef_fl, eef_fr;
+Vector3d coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr;
 Matrix3d rot_world_virtual_base;
-
 Vector3d gravity1(0,0, -9.81); //mi serve solo per inizializzare la classe quadruped->update vedi se va bene dichiararlo qui
 Matrix4d world_H_base; //come sopra
 VectorXd q_joints(12,1);
 VectorXd dq_joints(12,1);
 Matrix<double,6,1> basevel;
-Vector3d floating_base_position;
-Matrix<double, 18,1> q_joints_total;
-Matrix<double, 18,1> dq_joints_total;
-Matrix<double,6,1> floating_base_pose;
-Matrix<double,6,1> floating_base_posed;
-Matrix<double,3,1> floating_base_orientation;
+Vector3d floating_base_position;//posso inserirla come variabile locale alla callback modelState
+Matrix<double, 18,1> q_joints_total, dq_joints_total;
+Matrix<double,6,1> floating_base_pose, floating_base_posed;
+Matrix<double,3,1> floating_base_orientation; //posso inserirla come variabile locale alla callback modelState
 double com_zdes = 0.4;
+Vector3d com_pos,com_vel;
 
 
 void Joint_cb(sensor_msgs::JointStateConstPtr js){
@@ -101,7 +91,7 @@ void Joint_cb(sensor_msgs::JointStateConstPtr js){
 	float _rflv = js->velocity[8];
 	float _rfrv = js->velocity[11];
 */
-//vedi queste errore su q_joints
+
 	q_joints << js->position[11], js->position[8], js->position[2], js->position[5], js->position[4],  js->position[3], js->position[1],  js->position[0] , js->position[7], js->position[6], js->position[10], js->position[9];
 	dq_joints<< js->velocity[11], js->velocity[8], js->velocity[2], js->velocity[5], js->velocity[4],  js->velocity[3], js->velocity[1],  js->velocity[0] , js->velocity[7], js->velocity[6], js->velocity[10],  js->velocity[9];
 
@@ -138,19 +128,17 @@ void eefr_cb(gazebo_msgs::ContactsStateConstPtr eefr){
 	coo_ee_fr<<eefr->states[0].contact_positions[0].x,eefr->states[0].contact_positions[0].y, eefr->states[0].contact_positions[0].z;
 }
 
+//posizione centro di massa
 void Com_cb(geometry_msgs::PointStampedConstPtr pos){
 	
-	float x_com = pos->point.x;
-	float y_com = pos->point.y;
-	float z_com = pos->point.z;
+	 com_pos << pos->point.x, pos->point.y, pos->point.z;
 }
 
+//velocità centro di massa
 void VCom_cb(geometry_msgs::TwistStampedConstPtr data){
 	
-	float xdcom = data->twist.linear.x;
-	float ydcom = data->twist.linear.y;
-	float zdcom = data->twist.linear.z;
-
+	com_vel << data->twist.linear.x, data->twist.linear.y, data->twist.linear.z;
+	
 }
 
 
@@ -196,18 +184,6 @@ void modelState_cb( const gazebo_msgs::ModelStates &pt){
 
 int main(int argc, char **argv){
 	string modelFile="/home/salvatore/ros_ws/src/DogBotV4/ROS/src/dogbot_description/urdf/dogbot.urdf";
-	     
-	
-cout<<"prova0"<<endl;
-	double ti=0.0, tf=3.0, t=0.0;
-	
-	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
-	
-	init_pos = floating_base_pose;
-	end_pos = floating_base_posed;
-
-	init_vel = Matrix<double,6,1>::Zero();
-	init_vel = end_vel = init_acc = end_acc;
 
 	CIN_DIR  *leglength; //va bene dichiarata in questa parte del codice?
 	leglength = new CIN_DIR;
@@ -219,13 +195,15 @@ cout<<"prova0"<<endl;
 	ottim = new PROB_QUAD;
 
 	POLI_SUP *poligono_sup;
-	poligono_sup = new POLI_SUP;
-
+	poligono_sup = new POLI_SUP;  
+	
+	cout<<"prova0"<<endl;
 	TrajPlanner *traiettoria;
-	traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
 
-	trajectory_point traj;
-     traj = traiettoria->getTraj();
+	CAPTURE_POINT *cp;
+	cp = new CAPTURE_POINT;
+	
+	
 	
 	//Start node
 	ros::init(argc, argv, "ros_control_node");
@@ -280,9 +258,32 @@ cout<<"prova0"<<endl;
 	
 	//pause gazebo
 	pauseGazebo.call(pauseSrv);
-cout<<"prova"<<endl;
+
+	//Update robot 
+	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
+	//traiettoria
+	double ti=0.0, tf=1.0, t=0.0;
 	
+	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
+
+	// Initial position
+      init_pos= doggo->getCOMpos();
+    
+    // Desired position
+      end_pos<<0.0, -0.0, 0.4,0,0,0;
+   
+    // Initial velocity
+      init_vel= doggo->getCOMvel();
+	
+
+	end_vel = Matrix<double,6,1>::Zero();
+	end_vel = init_acc = end_acc;
+	
+	traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
+
+	trajectory_point traj;
+     traj = traiettoria->getTraj();
 	
 
 		// initial simulation time 
@@ -295,6 +296,23 @@ cout<<"prova"<<endl;
 	
 	cout<<"joint_state_available: "<<joint_state_available<<endl;
 			if(joint_state_available==true && joint_base_available==true){
+				/*
+				cout<<"world_H_base"<<endl<<world_H_base<<endl;
+				cout<<"basevel"<<endl<<basevel<<endl;
+				cout<<"q_joints"<<endl<<q_joints<<endl;
+				cout<<"dq_joints"<<endl<<dq_joints<<endl;
+				cout<<"gravity1"<<endl<<gravity1<<endl;
+				*/
+				
+			
+				VectorXd b=doggo->getBiasMatrix();
+				Matrix<double,18,18> M=doggo->getMassMatrix();
+				Matrix<double,24,18> Jc=doggo->getJacobian();
+				Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
+				Matrix<double,18,18> T=doggo->getTransMatrix();
+				Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
+			
+				//cout<<"b:"<<endl<<b<<endl;
 
 				// Time
          		t = (ros::Time::now()-begin).toSec();
@@ -303,8 +321,12 @@ cout<<"prova"<<endl;
 				Matrix<double,6,1> composdes, comveldes, comaccdes;
 				composdes<<traj.pos(0,idx), traj.pos(1,idx), traj.pos(2,idx), 0,  0, 0;
 				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx), 0,  0, 0;
+				
 				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx), 0,  0, 0;
-cout<<"prova2"<<endl;
+
+				cout<<"com posizione desiderata:"<<endl<<composdes<<endl;
+				cout<<"com velocità desiderata:"<<endl<<composdes<<endl;
+				
 				//Calcolo lunghezza gamba fisica
 				leglength->calculate_leg_length_cb(hp, kp);
 				VectorXd ll = leglength->getLegLength();
@@ -315,32 +337,26 @@ cout<<"prova2"<<endl;
 				cout<<"coordinate ee bl: "<<endl<<coo_ee_bl<<endl;
 				*/
 				poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
+				//coefficinete angolare
+				float m = poligono_sup->getm();
+				//intercetta verticale
+				float q_positive = poligono_sup->getq_newp();
+				float q_negative = poligono_sup->getq_newn();
+				float q_s = poligono_sup->getqs();
+				float q_r = poligono_sup->getqr();
+
+				
 			
-				/*
-				cout<<"world_H_base"<<endl<<world_H_base<<endl;
-				cout<<"basevel"<<endl<<basevel<<endl;
-				cout<<"q_joints"<<endl<<q_joints<<endl;
-				cout<<"dq_joints"<<endl<<dq_joints<<endl;
-				cout<<"gravity1"<<endl<<gravity1<<endl;
-				*/
-				doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
-			
-				VectorXd b=doggo->getBiasMatrix();
-				Matrix<double,18,18> M=doggo->getMassMatrix();
-				Matrix<double,24,18> Jc=doggo->getJacobian();
-				Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
-				Matrix<double,18,18> T=doggo->getTransMatrix();
-				Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
-			
-				//cout<<"b:"<<endl<<b<<endl;
 				//stampo giunti che passo al controllo ottimo
 				for (int i=0; i<18; i++){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
-					//cout<<"zcom: "<<floating_base_position[2]<<endl;
-					//cout<<"dzcom: "<<basevel[2]<<endl;
 				}
-				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total,floating_base_position[2],basevel[2],composdes,comveldes);
+
+				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes);
 				vector<double> tau = ottim->getTau();
+
+				cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel);
+
 				//--------------------pubblico le coppie calcolate --------------------
 				
 			cout<<"prova4"<<endl;

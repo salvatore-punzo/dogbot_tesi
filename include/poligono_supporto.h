@@ -33,7 +33,11 @@ class POLI_SUP{
         POLI_SUP();
         void calcoloPoligonoSupporto(VectorXd &ll, VectorXd &hp, VectorXd &he, VectorXd &kp, VectorXd &rp, Vector3d &eef_bl, Vector3d &eef_br,Vector3d &eef_fl, Vector3d &eef_fr, Vector3d &coo_ee_bl, Vector3d &coo_ee_br, Vector3d &coo_ee_fl, Vector3d &coo_ee_fr, Matrix3d &rot_world_virtual_base);
       //get function
-
+        float getm();
+        float getq_newp();
+        float getq_newn();
+        float getqr();
+        float getqs();
     private:
         Matrix3d rot_roll_br, rot_pitch_br, rot_knee_br, rot_roll_bl, rot_pitch_bl, rot_knee_bl;
         Vector3d sele_z;

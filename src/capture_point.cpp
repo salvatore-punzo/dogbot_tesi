@@ -1,24 +1,15 @@
-#include "prob_quadratico.h"
-#include "traj_planner.h"
+#include "capture_point.h"
 
 using namespace std;
-PROB_QUAD::PROB_QUAD(){
-   
+
+CAPTURE_POINT::CAPTURE_POINT(){
+
 };
 
-void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes){
-//cout<<"What a wonderful day!"<<endl;
-
-//Jacobian task 1
-	Jt1<<Matrix<double,1,18>::Zero(),
-		Matrix<double,1,18>::Zero(),
-		0,0,1,Matrix<double,1,15>::Zero();
-
-	Jt1_T<<Jt1 * T;
-
-	Jt1_Tdot_dq<<Jt1 * T_dot * dq_joints_total;
-
-	//Sn è la matrice che seleziona le componenti sull'asse z delle forze di contatto
+void CAPTURE_POINT::capture_point(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Vector3d &com_pos, Vector3d &com_vel){
+	//eigenfrequency
+	w=sqrt(9.81/com_zdes);
+    //Sn è la matrice che seleziona le componenti sull'asse z delle forze di contatto
 	Sn<<0,0,1,Matrix<double,1,9>::Zero(),
 		Matrix<double,1,5>::Zero(),1,Matrix<double,1,6>::Zero(),
 		Matrix<double,1,8>::Zero(),1,Matrix<double,1,3>::Zero(),
@@ -45,15 +36,15 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
     //imposto il problema quadratico
 	Matrix<double,43,43> aa;
 	aa<<Matrix<double,43,43>::Zero();
-	aa(42,42)=1;
+	//aa(42,42)=1;
 	real_2d_array a;
-	a.setlength(43,43);
-	a.setcontent(43,43,&aa(0,0));
+	a.setlength(42,42);
+	a.setcontent(42,42,&aa(0,0));
 	
   
     real_1d_array s;
-	s.setlength(43);
-	for(int i = 0; i< 43; i++){
+	s.setlength(42);
+	for(int i = 0; i< 42; i++){
 		
 		s(0)=1;
 	} 
@@ -66,48 +57,39 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	real_2d_array c; 
 	
 	
-	Matrix<double,37,44> A;
-
-	
-     
-		e<<0,0,q_joints_total[2] - composdes[2];//posizione corrente dei giunti della floating base - posizione desiderata
-		
-		e_dot<<0,0,dq_joints_total[2] - comveldes[2]; //velocità corrente asse z to do metti velocità desiderata
-	//controlla i segni di kp e kd, controlla i segni della matrice A, verifica Jt1
-	
-	A<<M,Jc_T_B,-S_T,Matrix<double,18,1>::Zero(),-b,
-		B_T_Jc, Matrix<double,12,25>::Zero(),-B.transpose()*Jcdqd,
-		Matrix<double,4,18>::Zero(), Sn, Matrix<double,4,13>::Zero(),Matrix<double,4,1>::Zero(),
-		Jt1_T, Matrix<double,3,24>::Zero(),Matrix<double,3,1>::Ones(), -Jt1_Tdot_dq -kd*e_dot - kp * e;
+	Matrix<double,34,43> A;
+    A<<M,Jc_T_B,-S_T,-b,
+		B_T_Jc, Matrix<double,12,24>::Zero(),-B.transpose()*Jcdqd,
+		Matrix<double,4,18>::Zero(), Sn, Matrix<double,4,13>::Zero();
 	
 	//cout<<"A:"<<endl;
 	//cout<<A<<endl;
-	c.setlength(37,44);
-	c.setcontent(37,44, &A(0,0));
+	c.setlength(34,43);
+    c.setcontent(34,43, &A(0,0));
 
 	
 	
 
 	//parametro che imposta la tipologia del vincolo 
 	integer_1d_array ct;
-	ct.setlength(37);
+	ct.setlength(34);
 	for(int i = 0; i <30; i++){
 		ct(i) = 0;
 	}
-	for(int i = 30; i<37; i++){
+	for(int i = 30; i<34; i++){
 		ct(i) = 1;
 	}
 
 	//box constrain
 	real_1d_array bndl;
-	bndl.setlength(43);
+	bndl.setlength(42);
 	real_1d_array bndu;
-	bndu.setlength(43);
+	bndu.setlength(42);
 	VectorXd qmin(12);
 	VectorXd qmax(12);
 	double dt=0.001;
 	double Dt=10*dt;
-    //controlla se l'ordine delle condizioni di qmin e qmax è giusto
+
 	qmin<<-1.7453,-1.7453,-1.7453,-1.7453,-3.14159265359,-0.02,-1.57079632679,-2.61795,-1.57079632679,-2.61795,-3.14159265359,-0.02;
 	qmax<<1.7453, 1.7453, 1.7453, 1.7453, 1.57079632679, 2.61795, 3.14159265359, 0.02, 3.14159265359, 0.02, 1.57079632679, 2.61795;
 	
@@ -132,18 +114,7 @@ void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 		bndu(i)= 60;
 	}
 
-	bndl(42)= fp_neginf;//-Infinity
-	bndu(42)= fp_posinf;//+Infinity
-	/*
-for(int i = 6;i<18;i++){
-	cout<<"limite superiore sulle accelerazioni: "<<bndu(i)<<endl;
-	cout<<"limite inferiore sulle accelerazioni: "<<bndl(i)<<endl;
-	cout<<"q joints corrente "<<i<<": "<<q_joints_total(i)<<endl;
-	cout<<"qmax - qcorrente: "<<qmax(i-6)-q_joints_total(i)<<endl;
-	cout<<"qmin - qcorrente: "<<qmin(i-6)-q_joints_total(i)<<endl;
-}
-	*/
-	real_1d_array x;
+    real_1d_array x;
 	minqpstate state;
     minqpreport rep;
 
@@ -174,10 +145,4 @@ for(int i = 6;i<18;i++){
 	}
 */
 
-}
-//get function
-
-vector<double> PROB_QUAD::getTau(){
-
-    return tau;
 }
