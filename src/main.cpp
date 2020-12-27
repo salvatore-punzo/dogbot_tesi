@@ -33,7 +33,7 @@
 #include "prob_quadratico.h"
 #include "poligono_supporto.h"
 #include "traj_planner.h"
-//#include "capture_point.h"
+#include "capture_point.h"
 
 
 using namespace Eigen;
@@ -216,10 +216,10 @@ int main(int argc, char **argv){
 	
 	cout<<"prova0"<<endl;
 	TrajPlanner *traiettoria;
-/*
+
 	CAPTURE_POINT *cp;
 	cp = new CAPTURE_POINT;
-	*/
+	
 	
 	
 	//Start node
@@ -370,15 +370,15 @@ int main(int argc, char **argv){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
 				}
 
-				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel);
-				vector<double> tau = ottim->getTau();
-
-				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel);
-
+				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel);
+				//vector<double> tau = ottim->getTau();
+				cout<<"wow"<<endl;
+				cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
+				cout<<"wow1"<<endl;
 				//--------------------pubblico le coppie calcolate --------------------
 				
 			cout<<"prova4"<<endl;
-
+/*
 				// set up dimensions
 				msg_ctrl.layout.dim.push_back(std_msgs::MultiArrayDimension());
 				msg_ctrl.layout.dim[0].size = tau.size();
@@ -394,7 +394,7 @@ int main(int argc, char **argv){
 				}
 				
 				_tau_pub.publish(msg_ctrl);
-				
+		*/		
 			
 
 			}

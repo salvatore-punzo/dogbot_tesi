@@ -25,7 +25,7 @@ using namespace std;
 class CAPTURE_POINT{
     public:
         CAPTURE_POINT();
-        void capture_point(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Vector3d &com_pos, Vector3d &com_vel);
+        void capture_point(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Vector3d &com_pos, Vector3d &com_vel, float &m, float &q_plus, float &q_minus, float &qs, float &qr);
     
         //get function
         vector<double> getTau();
@@ -41,10 +41,13 @@ class CAPTURE_POINT{
         Matrix<double,18,12> S_T;
         Matrix<double,24,12> B;
         Matrix<double, 6, 1> q_base;
+        double tnp,tnn, tnr, tns;
         
         int CT[34];
         Matrix3d kp = 25*MatrixXd::Identity(3,3);
         Matrix3d kd = 10*MatrixXd::Identity(3,3); //2*sqrt(kp);
+        double dt=0.001;
+	    double Dt=10*dt;
         double com_zdes = 0.4;//posizione desiderata centro di massa
         float w;//eigenfrequency
         vector<double> tau;
