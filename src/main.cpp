@@ -362,7 +362,10 @@ int main(int argc, char **argv){
 				float q_negative = poligono_sup->getq_newn();
 				float q_s = poligono_sup->getqs();
 				float q_r = poligono_sup->getqr();
-
+				
+				cout<<"mm: "<<m<<endl;
+				cout<<"qsm: "<<q_s<<endl;
+				cout<<"qrm: "<<q_r<<endl;
 				
 			
 				//stampo giunti che passo al controllo ottimo
@@ -377,8 +380,8 @@ int main(int argc, char **argv){
 				cout<<"wow1"<<endl;
 				//--------------------pubblico le coppie calcolate --------------------
 				
-			cout<<"prova4"<<endl;
-/*
+				vector<double> tau = cp->getTau();
+
 				// set up dimensions
 				msg_ctrl.layout.dim.push_back(std_msgs::MultiArrayDimension());
 				msg_ctrl.layout.dim[0].size = tau.size();
@@ -394,7 +397,7 @@ int main(int argc, char **argv){
 				}
 				
 				_tau_pub.publish(msg_ctrl);
-		*/		
+				
 			
 
 			}

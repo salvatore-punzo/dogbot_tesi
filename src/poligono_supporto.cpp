@@ -65,13 +65,13 @@ void POLI_SUP::calcoloPoligonoSupporto(VectorXd &ll, VectorXd &hp, VectorXd &he,
 	_ee_f_vb_ll = 2 * eef_br_wc; 
 	
 //calcolo posizioni dei piedi del virtual biped
-/*
+
 	xc_vb_rl = (coo_ee_bl(0) + coo_ee_fr(0))/2; 
 	yc_vb_rl = (coo_ee_bl(1) + coo_ee_fr(1))/2;
 
 	xc_vb_ll = (coo_ee_br(0) + coo_ee_fl(0))/2;
 	yc_vb_ll = (coo_ee_br(1) + coo_ee_fl(1))/2;
-
+/*
 	cout<<"coordinata x del piede destro del virtual biped: "<<xc_vb_rl<<endl;
 	cout<<"coordinata y del piede destro del virtual biped: "<<yc_vb_rl<<endl;
 	cout<<"coordinata x del piede sinistro del virtual biped: "<<xc_vb_ll<<endl;
@@ -89,7 +89,37 @@ void POLI_SUP::calcoloPoligonoSupporto(VectorXd &ll, VectorXd &hp, VectorXd &he,
 	cout<<"copx: "<<cop_x<<endl; //TO DO: verifica se i COP cosí calcolati vanno bene o se li devi calcolare con l'altra formula vedi paper
 	cout<<"copy: "<<cop_y<<endl;
 */
+    //Parametri delle rette del poligono di supporto
+    m = ( yc_vb_rl - yc_vb_ll ) / ( xc_vb_rl - xc_vb_ll ); // (y2-y1)/(x2-x1)
+	q = - xc_vb_ll * m + yc_vb_ll;//-x1*m +y1
+    
+	q_newp = q + 0.01;
+	q_newn = q - 0.01;
+	m_pep = -1/m; //m perpendicolare
+	qr = yc_vb_ll - m_pep * xc_vb_ll;
+	qs = yc_vb_rl - m_pep * xc_vb_rl;
+/*
+    cout<<"m1"<<m<<endl;
+    cout<<"q"<<q<<endl;
+    cout<<"xc_vb_rl: "<<xc_vb_rl<<endl;
+    cout<<"xc_vb_ll: "<<xc_vb_ll<<endl;
+    cout<<"yc_vb_ll: "<<yc_vb_ll<<endl;
+    */
 
+    //Calcolo vertici del poligono di supporto
+    /*
+    xa=(qr-q_newp)/((pow(m,2)+1)/m);
+	ya=-(qr - q_newp)/(pow(m,2)+1)+ qr;
+
+	xb=(qs-q_newp)/((pow(m,2)+1)/m);
+	yb=-(qs - q_newp)/(pow(m,2)+1)+ qs;
+
+	xc=(qs-q_newn)/((pow(m,2)+1)/m);
+	yc=-(qs - q_newn)/(pow(m,2)+1)+ qs;
+
+	xd=(qr-q_newn)/((pow(m,2)+1)/m);
+	yd=-(qr - q_newn)/(pow(m,2)+1)+ qr;
+*/
 }
 
 //GET FUNCTION

@@ -9,10 +9,12 @@ CAPTURE_POINT::CAPTURE_POINT(){
 void CAPTURE_POINT::capture_point(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Vector3d &com_pos, Vector3d &com_vel,  float &m, float &q_plus, float &q_minus, float &qs, float &qr){
 	//eigenfrequency
 	w=sqrt(9.81/com_zdes);
+	/*
 	cout<<"m: "<<m<<endl;
 	cout<<"qs: "<<qs<<endl;
 	cout<<"qr: "<<qr<<endl;
-	m=2;
+	*/
+	
 	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_plus +m * com_pos[0] +m * com_vel[0] * Dt  +m *com_pos[0]/w - com_pos[1] - com_vel[1] * Dt - com_vel[1]/w);
 	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_minus +m * com_pos[0] +m * com_vel[0] * Dt  +m *com_pos[0]/w - com_pos[1] - com_vel[1] * Dt - com_vel[1]/w);
    	tnr = 2*w/(pow(Dt,2)*w + 2 * Dt) * (qr + (-1/m) * com_pos[0] +(-1/m) * com_vel[0] * Dt  +(-1/m) *com_pos[0]/w - com_pos[1] - com_vel[1] * Dt - com_vel[1]/w);
@@ -66,7 +68,7 @@ void CAPTURE_POINT::capture_point(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 
 	real_2d_array c; 
 	
-	cout<<"ottim"<<endl;
+	
 	Matrix<double,38,45> A;
 	
     A<< -m, 1, Matrix<double,1,42>::Zero(), tnp,
@@ -76,14 +78,15 @@ void CAPTURE_POINT::capture_point(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 		Matrix<double,18,2>::Zero(), M,Jc_T_B,-S_T,-b,
 		Matrix<double,12,2>::Zero(), B_T_Jc, Matrix<double,12,24>::Zero(),-B.transpose()*Jcdqd,
 		Matrix<double,4,2>::Zero(), Matrix<double,4,18>::Zero(), Sn, Matrix<double,4,12>::Zero(),Matrix<double,4,1>::Zero();
-	
+	/*
 	cout<<"A:"<<endl;
 	cout<<A<<endl;
-	cout<<"ottim1"<<endl;
+	*/
+	
 	c.setlength(38,45);
     c.setcontent(38,45, &A(0,0));
 
-	cout<<"ottim2"<<endl;
+	
 
 
 	//parametro che imposta la tipologia del vincolo 
@@ -108,69 +111,77 @@ void CAPTURE_POINT::capture_point(VectorXd &b, Matrix<double,18,18> &M, Matrix<d
 	bndu.setlength(44);
 	VectorXd qmin(12);
 	VectorXd qmax(12);
-	cout<<"ottim3"<<endl;
+	
 
 	qmin<<-1.7453,-1.7453,-1.7453,-1.7453,-3.14159265359,-0.02,-1.57079632679,-2.61795,-1.57079632679,-2.61795,-3.14159265359,-0.02;
 	qmax<<1.7453, 1.7453, 1.7453, 1.7453, 1.57079632679, 2.61795, 3.14159265359, 0.02, 3.14159265359, 0.02, 1.57079632679, 2.61795;
 	
-	cout<<"ottim31"<<endl;
+	
 	//Vincoli sulle accelerazioni ai giunti virtuali
 	for(int i = 0; i<8; i++){
 		bndl(i)=fp_neginf;//-INFINITY
 		bndu(i)=fp_posinf;//+INFINITY
 	}
-	cout<<"ottim32"<<endl;
+	
 	//Vincoli sulle accelerazioni
 	for(int i = 8; i<20; i++){
 		bndl(i)=(2/pow(Dt,2)) * (qmin(i-8)-q_joints_total(i-2)- Dt * dq_joints_total(i-2));// fp_neginf;//-INFINITY
 		bndu(i)=(2/pow(Dt,2)) * (qmax(i-8)-q_joints_total(i-2)- Dt * dq_joints_total(i-2));// fp_posinf;//+INFINITY
 	}
-	cout<<"ottim33"<<endl;
+	
 	//Vincoli sulle forze di contatto
 	for(int i = 20; i<32; i++){
 		bndl(i)=fp_neginf;//-INFINITY
 		bndu(i)=fp_posinf;//+INFINITY
 	}
-	cout<<"ottim34"<<endl;
+	
 	//Vincoli sulle coppie
 	for(int i=32; i<44; i++){
 		bndl(i)= -60;
 		bndu(i)= 60;
 	}
-cout<<"ottim4"<<endl;
+
     real_1d_array x;
 	minqpstate state;
     minqpreport rep;
-cout<<"ottim5"<<endl;
+
 	 // NOTE: for convex problems you may try using minqpsetscaleautodiag()
     //       which automatically determines variable scales.
 	minqpsetscale(state, s);
 	// create solver, set quadratic/linear terms
-	cout<<"ottim6"<<endl;
+	
     minqpcreate(44, state);
-	cout<<"ottim7"<<endl;
+	
     minqpsetquadraticterm(state, a);
-	cout<<"ottim8"<<endl;
+	
 	//minqpsetlinearterm(state, l); non mi servono perchè di default sono già impostati a zero
     minqpsetlc(state, c, ct);
-	cout<<"ottim9"<<endl;
+	
 	minqpsetbc(state, bndl, bndu);
-	cout<<"ottim10"<<endl;
+	
 	minqpsetalgobleic(state, 0.0, 0.0, 0.0, 0);
-	cout<<"ottim11"<<endl;
+	
     minqpoptimize(state);
-	cout<<"ottim12"<<endl;
+	
 	minqpresults(state, x, rep);
 
 	cout<<"Variabili ottimizzate: ";
     printf("%s\n", x.tostring(1).c_str());
 	cout<<endl;
-
-    tau = { x(30),x(40),x(41),x(31),x(38),x(39),x(33),x(34),x(35),x(32),x(36),x(37)};
+//i valori delle coppie sono scalati di 2 perchè ho aggiunto 2 variabili di controllo iniziali
+    tau = { x(32),x(42),x(43),x(33),x(40),x(41),x(35),x(36),x(37),x(34),x(38),x(39)};
 	/*
 	for(int i =0; i<12; i++){
 		cout<<"tau: "<<tau[11-i]<<endl;
 	}
 */
 
+}
+
+
+//get function
+
+vector<double> CAPTURE_POINT::getTau(){
+
+    return tau;
 }
