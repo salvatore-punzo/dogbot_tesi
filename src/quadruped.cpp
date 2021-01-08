@@ -1,6 +1,6 @@
 #include "quadruped.h"
 #include "alglib/optimization.h"
-
+#include "Td_matrix.cpp"
 QUADRUPED::QUADRUPED()
 {
 };
@@ -11,7 +11,7 @@ QUADRUPED::QUADRUPED(std::string modelFile)
 	// Create the robot 
 	createrobot(modelFile);
     model = kinDynComp.model();
-	
+	std::cout<<"h1"<<endl;
 	// Resize matrices of the class given the number of DOFs
     n=model.getNrOfDOFs();
     robot_mass=model.getTotalMass();
@@ -20,16 +20,22 @@ QUADRUPED::QUADRUPED(std::string modelFile)
     jointVel=iDynTree::VectorDynSize(n);
 	q=iDynTree::VectorDynSize(6+n);
 	dq=iDynTree::VectorDynSize(6+n);
+	qb=iDynTree::VectorDynSize(6+n);
+	dqb=iDynTree::VectorDynSize(6+n);
 	qmin= iDynTree::VectorDynSize(n);
 	qmax= iDynTree::VectorDynSize(n);
 	Bias=iDynTree::VectorDynSize(n+6);
 	GravMatrix=iDynTree::MatrixDynSize(n+6,1);
     MassMatrix=iDynTree::FreeFloatingMassMatrix(model) ;
     Jcom=iDynTree::MatrixDynSize(3,6+n);
-	Jac=iDynTree::MatrixDynSize(24,6+n);	
+	Jb=iDynTree::MatrixDynSize(6,6+n);
+	Jcomdot=iDynTree::MatrixDynSize(6,6+n);
+	Jac=iDynTree::MatrixDynSize(24,6+n);
+	JacDot=iDynTree::MatrixDynSize(24,6+n);	
 	Jdqd=iDynTree::MatrixDynSize(24,1);
     T=iDynTree::MatrixDynSize(6+n,6+n);
 	T_inv_dot=iDynTree::MatrixDynSize(6+n,6+n);
+	T_dot=iDynTree::MatrixDynSize(6+n,6+n);
     MassMatrixCOM=iDynTree::FreeFloatingMassMatrix(model) ;
     BiasCOM=iDynTree::VectorDynSize(n+6);
 	GravMatrixCOM=iDynTree::MatrixDynSize(n+6,1);
@@ -47,21 +53,37 @@ void QUADRUPED::update (Eigen::Matrix4d &eigenWorld_H_base, Eigen::VectorXd &eig
 {   
 
    // Update joints, base and gravity from inputs
-	
+	std::cout<<"h2"<<endl;
 	 iDynTree::fromEigen(world_H_base,eigenWorld_H_base);
+	 std::cout<<"h21"<<endl;
      iDynTree::toEigen(jointPos) = eigenJointPos;
+	 std::cout<<"h22"<<endl;
      iDynTree::fromEigen(baseVel,eigenBasevel);
+	 std::cout<<"h23"<<endl;
      toEigen(jointVel) = eigenJointVel;
      toEigen(gravity)  = eigenGravity;
 
-	
+	std::cout<<"h3"<<endl;
 	//Set the state for the robot 
 	
 	 kinDynComp.setRobotState(world_H_base,jointPos,
                               baseVel,jointVel,gravity);
+	std::cout<<"h4"<<endl;
   
+    // Compute position base +joints
+	iDynTree::Vector3 base_angle=world_H_base.getRotation().asRPY();
+	toEigen(qb)<<toEigen(world_H_base.getPosition()),
+	            toEigen(base_angle),
+	            eigenJointPos;
+
+	// Compute velocity base+joints
+
+	toEigen(dqb)<<eigenBasevel,
+	             eigenJointVel;
+
+std::cout<<"h5"<<endl;
     // Compute Center of Mass
-     iDynTree::Vector3 base_angle=world_H_base.getRotation().asRPY();
+     
      toEigen(CoM)<<toEigen(kinDynComp.getCenterOfMassPosition()),
 	               toEigen(base_angle);
 				   
@@ -116,11 +138,10 @@ void QUADRUPED::update (Eigen::Matrix4d &eigenWorld_H_base, Eigen::VectorXd &eig
 	  //Compute Jacobian term
 	
 	     computeJac();
-	
+	 
 	  // Compute Bias Acceleration -> J_dot*q_dot
 	
 	     computeJacDotQDot();
-	
 	  // Velocity vector (base+joints)
 	     Eigen::Matrix<double, 18,1> q_dot;
 	               
@@ -255,14 +276,15 @@ void  QUADRUPED::computeJacDotQDot()
 
 //Method to get directly Jacobian time derivative, slower
 
-void  QUADRUPED::computeJacDot(Eigen::VectorXd Vel_)
+void  QUADRUPED::computeJacDot(Eigen::Matrix<double,18,1> Vel_)
 {    
 	
  
 	 // set ausiliary matrices
 	iDynTree::MatrixDynSize Jac;
 	Jac=iDynTree::MatrixDynSize(6,6+n);
-		
+    iDynTree::Twist vel_foot;
+
 	Eigen::MatrixXd Jac_;
 	Jac_=Eigen::MatrixXd::Zero(6,18);
 	
@@ -278,7 +300,8 @@ void  QUADRUPED::computeJacDot(Eigen::VectorXd Vel_)
 	// Getting Jacobian of the leg
 		kinDynComp.getFrameFreeFloatingJacobian(8+3*k,Jac);
         Jac_= iDynTree::toEigen(Jac);
-		
+		vel_foot=kinDynComp.getFrameVel(8+3*k);
+
     for(unsigned int i=0;i<6+n;++i)
     {  
      // Getting column i derivative
@@ -296,16 +319,32 @@ void  QUADRUPED::computeJacDot(Eigen::VectorXd Vel_)
         }
 	 	
 	 Jac_=Eigen::MatrixXd::Zero(6,18);
-	 Jacdot.block(0+6*k,0,6,18)<<jac_;
+	 Jacdot.block(0+6*k,6,6,12)<<jac_.block(0,6,6,12);
+
+    Eigen::Matrix<double,6,1> xic_dot=toEigen(vel_foot)-toEigen(baseVel);
+    
+	Eigen::Matrix<double,3,3> xic_hat_dot;
+    xic_hat_dot<<0, -xic_dot[2], xic_dot[1],
+	            xic_dot[2], 0, -xic_dot[0],                          
+	            -xic_dot[1], xic_dot[0], 0;
+
+
+
+     Jacdot.block(0+6*k,0,6,6)<<Eigen::MatrixXd::Zero(3,3), -xic_hat_dot,
+	                            Eigen::MatrixXd::Zero(3,6) ;
+
+
 	 jac_=Eigen::MatrixXd::Zero(6,18);
+     
+	
 	
 
 } 
-	//Eigen::VectorXd jd=Eigen::VectorXd::Zero(6);
-	
-	
+
+	toEigen(JacDot)=Jacdot;
 	
 }
+
 
 // Compute partial time derivative
 Eigen::VectorXd QUADRUPED::getPartialDerivativeJac(const Eigen::MatrixXd Jacobian, const unsigned int& joint_idx,  const unsigned int& column_idx)
@@ -365,7 +404,7 @@ Eigen::VectorXd QUADRUPED::getPartialDerivativeJac(const Eigen::MatrixXd Jacobia
 void QUADRUPED::computeTransformation(Eigen::VectorXd Vel_)
 {   
 	//Set ausiliary matrices
-	iDynTree::MatrixDynSize Jb(6,6+n);
+	
 	iDynTree::MatrixDynSize Jbc(3,n);
 	iDynTree::Vector3 xbc;
 	iDynTree::MatrixDynSize xbc_hat(3,3);
@@ -414,34 +453,25 @@ void QUADRUPED::computeTransformation(Eigen::VectorXd Vel_)
 	
 	   // Time derivative of Jbc
 	   kinDynComp.getCentroidalAverageVelocityJacobian(Jbc_dot);
-	
-	  Eigen::Matrix<double,6,18> Jbcdot;
-	  Eigen::Matrix<double,6,18> jac_;
+	  
+	  Eigen::Matrix<double,6,12> jac_;
 	  Eigen::VectorXd jac_dot_k_=Eigen::VectorXd::Zero(6);
-	
-	   for(unsigned int i=0;i<6+n;++i)
-         {  
-            // Getting column i derivative
-		
-            for(unsigned int j=0;j<6+n;++j)
-            {
-                // Column J is the sum of all partial derivatives  ref (41)
-                    jac_dot_k_ += getPartialDerivativeJac(toEigen(Jbc_dot),j,i)*Vel_(j) ;
-				//*
-            }
-		
-        jac_.col(i)= jac_dot_k_ ;
-        jac_dot_k_=Eigen::VectorXd::Zero(6);
-		
-        }
-	   
-	    Jbcdot.block(0,0,6,18)<<jac_;
 
-	   // Tdot matrix
-	   toEigen(T_inv_dot)<<Eigen::MatrixXd::Zero(3,3), -toEigen(xbc_hat_dot), -Jbcdot.block<3,12>(0,6),
+	  TDMAT Tj(toEigen(qb),toEigen(dqb));
+	  Eigen::Matrix<double,3,12> Jbcdot=Tj.getTdmatrix();
+
+	   // T_inv_dot matrix
+	   toEigen(T_inv_dot)<<Eigen::MatrixXd::Zero(3,3), toEigen(xbc_hat_dot), Jbcdot,
+                      Eigen::MatrixXd::Zero(15,18);
+
+
+	   //Tdot matrix
+	   toEigen(T_dot)<<Eigen::MatrixXd::Zero(3,3), -toEigen(xbc_hat_dot), -Jbcdot,
                       Eigen::MatrixXd::Zero(15,18);
 	
-	
+   
+     toEigen(Jcomdot)<<Eigen::MatrixXd::Zero(3,3),  -toEigen(xbc_hat_dot), -Jbcdot,
+	                   Eigen::MatrixXd::Zero(3,6+n);
 }
 
 
@@ -453,6 +483,23 @@ Eigen::MatrixXd QUADRUPED::getMassMatrix()
 
 }
 
+//return Jcom Matrix
+Eigen::MatrixXd QUADRUPED::getJCOMMatrix()
+{
+	Eigen::Matrix<double,6,18> J_com;
+	J_com<< iDynTree::toEigen(Jcom),
+	        toEigen(Jb).block(3,0,3,18);
+	return J_com;
+
+}
+
+//return Jcom Matrix
+Eigen::MatrixXd QUADRUPED::getJCOMDot()
+{
+	Eigen::MatrixXd J_com = iDynTree::toEigen(Jcomdot);
+	return J_com;
+
+}
 
 //return Bias Matrix
 Eigen::VectorXd QUADRUPED::getBiasMatrix()
@@ -498,7 +545,7 @@ Eigen::MatrixXd QUADRUPED::getTransMatrix()
 //return matrix T_dot 
 Eigen::MatrixXd QUADRUPED::getTdotMatrix()
 {
-	Eigen::Matrix<double,18,18> t_dot = iDynTree::toEigen(T_inv_dot);
+	Eigen::Matrix<double,18,18> t_dot = iDynTree::toEigen(T_dot);
 	return t_dot;
 
 }

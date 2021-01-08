@@ -51,7 +51,9 @@ class QUADRUPED
   Eigen::MatrixXd getBiasAccCOM_linear();
   Eigen::MatrixXd getCOMpos();
   Eigen::MatrixXd getCOMvel();
-  
+  Eigen::MatrixXd getJCOMMatrix();
+  Eigen::MatrixXd getJCOMDot();
+
   double getMass();
   int getDoFsnumber();
 
@@ -80,6 +82,12 @@ class QUADRUPED
   
   // Gravity acceleration
   iDynTree::Vector3       gravity; 
+
+ // Position vector base+joints
+  iDynTree::VectorDynSize  qb;
+
+  // Velocity vector base+joints
+  iDynTree::VectorDynSize  dqb;
 
   // Position vector
   iDynTree::VectorDynSize  q;
@@ -112,8 +120,19 @@ class QUADRUPED
   // Jacobian
   iDynTree::MatrixDynSize Jac;
   
+ // Jacobian base
+  iDynTree::MatrixDynSize Jb;
+  
+
+  // Jacobian derivative
+  iDynTree::MatrixDynSize JacDot;
+
   //CoM Jacobian
   iDynTree::MatrixDynSize Jcom;
+ 
+  //CoM Jacobian
+  iDynTree::MatrixDynSize Jcomdot;
+
   
   // Bias acceleration J_dot*q_dot
   iDynTree::MatrixDynSize Jdqd;
@@ -121,9 +140,12 @@ class QUADRUPED
   // Transformation Matrix
   iDynTree::MatrixDynSize T;
   
-  // Transformation matrix time derivative
+  // Transformation matrix inverse time derivative
   iDynTree::MatrixDynSize T_inv_dot;
   
+  // Transformation matrix time derivative
+  iDynTree::MatrixDynSize T_dot;
+
   //Model
   iDynTree::Model model;
   iDynTree::ModelLoader mdlLoader;
@@ -163,7 +185,7 @@ class QUADRUPED
   void computeJacDotQDot();
   
   // Compute Jacobian time derivative
-  void computeJacDot(Eigen::VectorXd Vel_);
+ void computeJacDot(Eigen::Matrix<double, 18,1> Vel_);
   
   //Compute partial derivative
   Eigen::VectorXd  getPartialDerivativeJac(const Eigen::MatrixXd Jacobian, const unsigned int& joint_idx,  const unsigned int& column_idx);

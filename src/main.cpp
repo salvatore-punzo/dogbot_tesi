@@ -58,7 +58,7 @@ Matrix<double, 18,1> q_joints_total, dq_joints_total;
 Matrix<double,6,1> floating_base_pose, floating_base_posed;
 Matrix<double,3,1> floating_base_orientation; //posso inserirla come variabile locale alla callback modelState
 double com_zdes = 0.4;
-Vector3d com_pos,com_vel;
+//Vector3d com_pos,com_vel;
 
 
 void Joint_cb(sensor_msgs::JointStateConstPtr js){
@@ -146,7 +146,7 @@ void eefr_cb(gazebo_msgs::ContactsStateConstPtr eefr){
 }
 
 //posizione centro di massa
-void Com_cb(geometry_msgs::PointStampedConstPtr pos){
+/*void Com_cb(geometry_msgs::PointStampedConstPtr pos){
 	
 	 com_pos << pos->point.x, pos->point.y, pos->point.z;
 }
@@ -156,7 +156,7 @@ void VCom_cb(geometry_msgs::TwistStampedConstPtr data){
 	
 	com_vel << data->twist.linear.x, data->twist.linear.y, data->twist.linear.z;
 	
-}
+}*/
 
 
 
@@ -242,8 +242,8 @@ int main(int argc, char **argv){
 	ros::Subscriber _eefl_sub = _nh.subscribe("/dogbot/front_left_contactsensor_state",1, eefl_cb);
 	ros::Subscriber _eefr_sub = _nh.subscribe("/dogbot/front_right_contactsensor_state",1, eefr_cb);
 	ros::Subscriber _modelState_sub = _nh.subscribe("/gazebo/model_states", 1, modelState_cb);
-	ros::Subscriber _com_sub = _nh.subscribe("/dogbot/cog",1 ,Com_cb);
-	ros::Subscriber _vcom_sub = _nh.subscribe("/dogbot/v_cog",1, VCom_cb);
+	//ros::Subscriber _com_sub = _nh.subscribe("/dogbot/cog",1 ,Com_cb);
+	//ros::Subscriber _vcom_sub = _nh.subscribe("/dogbot/v_cog",1, VCom_cb);
 	
 	//Publisher
 	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",1);
@@ -277,10 +277,16 @@ int main(int argc, char **argv){
 	pauseGazebo.call(pauseSrv);
 
 	//Update robot 
+	cout<<"world_H_base"<<endl<<world_H_base<<endl;
+				cout<<"basevel"<<endl<<basevel<<endl;
+				cout<<"q_joints"<<endl<<q_joints<<endl;
+				cout<<"dq_joints"<<endl<<dq_joints<<endl;
+				cout<<"gravity1"<<endl<<gravity1<<endl;
+
 	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
 	//traiettoria
-	double ti=0.0, tf=1.0, t=0.0;
+	double ti=0.0, tf=1.5, t=0.0;
 	
 	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
 
@@ -296,7 +302,7 @@ int main(int argc, char **argv){
 
 	end_vel = Matrix<double,6,1>::Zero();
 	end_vel = init_acc = end_acc;
-	
+	std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
 	traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
 
 	trajectory_point traj;
@@ -320,7 +326,7 @@ int main(int argc, char **argv){
 				cout<<"dq_joints"<<endl<<dq_joints<<endl;
 				cout<<"gravity1"<<endl<<gravity1<<endl;
 				*/
-				
+				doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 			
 				VectorXd b=doggo->getBiasMatrix();
 				Matrix<double,18,18> M=doggo->getMassMatrix();
@@ -328,7 +334,10 @@ int main(int argc, char **argv){
 				Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
 				Matrix<double,18,18> T=doggo->getTransMatrix();
 				Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
-			
+			    Matrix<double,6,18> Jcom=doggo->getJCOMMatrix();
+                Matrix<double,6,18> Jcomdot=doggo->getJCOMDot();
+				MatrixXd com_pos=doggo->getCOMpos();
+                MatrixXd com_vel=doggo->getCOMvel();
 				//cout<<"b:"<<endl<<b<<endl;
 
 				// Time
@@ -336,15 +345,16 @@ int main(int argc, char **argv){
          		int idx= std::round( t*1000);
 
 				//Calcolo vettori desiderati prendo solo la posizione e non l'orientamento
-				Matrix<double,3,1> composdes, comveldes, comaccdes;
-				composdes<<traj.pos(0,idx), traj.pos(1,idx), traj.pos(2,idx);
-				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx);
+				Matrix<double,6,1> composdes, comveldes, comaccdes;
+				composdes<<traj.pos(0,idx), traj.pos(1,idx), traj.pos(2,idx),MatrixXd::Zero(3,1);
+				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx),MatrixXd::Zero(3,1);
 				
-				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx);
+				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx),MatrixXd::Zero(3,1);
 
 				cout<<"com posizione desiderata:"<<endl<<composdes<<endl;
 				cout<<"com velocità desiderata:"<<endl<<comveldes<<endl;
-				
+				cout<<"com posizione ottenuta:"<<endl<<com_pos<<endl;
+				cout<<"com velocità ottenuta:"<<endl<<com_vel<<endl;
 				//Calcolo lunghezza gamba fisica
 				leglength->calculate_leg_length_cb(hp, kp);
 				VectorXd ll = leglength->getLegLength();
@@ -354,7 +364,7 @@ int main(int argc, char **argv){
 				cout<<"he: "<<endl<<he<<endl;
 				cout<<"coordinate ee bl: "<<endl<<coo_ee_bl<<endl;
 				*/
-				poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
+				//poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
 				//coefficinete angolare
 				float m = poligono_sup->getm();
 				//intercetta verticale
@@ -373,27 +383,28 @@ int main(int argc, char **argv){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
 				}
 
-				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel);
-				//vector<double> tau = ottim->getTau();
+				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
+				vector<double> tau = ottim->getTau();
 				cout<<"wow"<<endl;
-				cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
+				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
 				cout<<"wow1"<<endl;
 				//--------------------pubblico le coppie calcolate --------------------
 				
-				vector<double> tau = cp->getTau();
+				//vector<double> tau = cp->getTau();
 
 				// set up dimensions
-				msg_ctrl.layout.dim.push_back(std_msgs::MultiArrayDimension());
-				msg_ctrl.layout.dim[0].size = tau.size();
+				//msg_ctrl.layout.dim.push_back(std_msgs::MultiArrayDimension());
+				/*msg_ctrl.layout.dim[0].size = tau.size();
 				msg_ctrl.layout.dim[0].stride = 1;
-				msg_ctrl.layout.dim[0].label = "x"; // or whatever name you typically use to index vec1
+				msg_ctrl.layout.dim[0].label = "x"; // or whatever name you typically use to index vec1*/
 
 				// copy in the data
 				msg_ctrl.data.clear();
-				msg_ctrl.data.insert(msg_ctrl.data.end(), tau.begin(), tau.end());
+				//msg_ctrl.data.insert(msg_ctrl.data.end(), tau.begin(), tau.end());
 				//stampa tau e controlla anche il topic command
 				for(int i =0; i<12; i++){
 					cout<<"tau: "<<tau[11-i]<<endl;
+					msg_ctrl.data.push_back(tau[i]);
 				}
 				
 				_tau_pub.publish(msg_ctrl);
@@ -406,7 +417,7 @@ int main(int argc, char **argv){
 			cout<<"stepper"<<endl;
 			ros::spinOnce();
 			cout<<"stepper2"<<endl;
-			
+			loop_rate.sleep();
 		
 		
 		

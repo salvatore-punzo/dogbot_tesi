@@ -26,7 +26,7 @@ using namespace std;
 class PROB_QUAD{
     public:
         PROB_QUAD();
-        void CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,3,1> &composdes, Matrix<double,3,1> &comveldes,  Vector3d &com_pos, Vector3d &com_vel);
+        void CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot);
         //get function
         vector<double> getTau();
 
@@ -36,19 +36,19 @@ class PROB_QUAD{
     Matrix<double,18,12> Jc_T_B;
 	Matrix<double,12,18> B_T_Jc;
 	Matrix<double,4,12> Sn;
-	Matrix<double,3,18> Jt1;
-	Matrix<double,3,18> Jt1_T;
-	Matrix<double,3,1> Jt1_Tdot_dq;
+	
+	Matrix<double,6,18> Jt1_T;
+	Matrix<double,6,1> Jt1_Tdot_dq;
     Matrix<double,12,18> S;
 	Matrix<double,18,12> S_T;
     Matrix<double,24,12> B;
 	Matrix<double, 6, 1> q_base;
 	
 	int CT[40];
-	Vector3d e;
-	Vector3d e_dot;
-	Matrix3d kp = 25*MatrixXd::Identity(3,3);
-	Matrix3d kd = 10*MatrixXd::Identity(3,3); //2*sqrt(kp);
+	Matrix<double,6,1> e;
+	Matrix<double,6,1> e_dot;
+	Matrix<double,6,6> kp = 2500*MatrixXd::Identity(6,6);
+	Matrix<double,6,6> kd = 50*MatrixXd::Identity(6,6); //2*sqrt(kp);
     double com_zdes = 0.4;
 
     vector<double> tau;
