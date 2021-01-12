@@ -1,23 +1,31 @@
-#include "prob_quadratico.h"
+#include "prob_quadratico_cp.h"
 //#include "traj_planner.h"
 
 using namespace std;
-PROB_QUAD::PROB_QUAD(){
+PROB_QUAD_CP::PROB_QUAD_CP(){
    
 };
 
-void PROB_QUAD::CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, 
-Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot){
-//cout<<"What a wonderful day!"<<endl;
+void PROB_QUAD_CP::CalcoloProbOttimoCP(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, 
+Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot,  float &m, float &q_plus, float &q_minus, float &qs, float &qr){
+	//eigenfrequency
+	w=sqrt(9.81/com_zdes);
+	
+	/*
+	cout<<"m: "<<m<<endl;
+	cout<<"qs: "<<qs<<endl;
+	cout<<"qr: "<<qr<<endl;
+	*/
+	
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_plus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_minus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+   	tnr = 2*w/(pow(Dt,2)*w + 2 * Dt) * (qr + (-1/m) * com_pos(0) +(-1/m) * com_vel(0) * Dt  +(-1/m) *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	tns = 2*w/(pow(Dt,2)*w + 2 * Dt) * (qs + (-1/m) * com_pos(0) +(-1/m) * com_vel(0) * Dt  +(-1/m) *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
 
-//Jacobian task 1
-	/*Jt1<<1,Matrix<double,1,17>::Zero(),
-		0,1, Matrix<double,1,16>::Zero(),
-		0,0,1,Matrix<double,1,15>::Zero();*/
 
 		
 	// Matrici Jacobiane
-	//cambia i nomi 
+
 	
 
 	Jt1_dot_dq<<Jcomdot * dq_joints_total;
@@ -54,11 +62,11 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	Eigen::Matrix<double,6,1> matrixb= -Jt1_dot_dq -kd*e_dot - kp * e;
 
     // Termine quadratico, minimizza l'equazione relativa all'errore, motion task
-	Eigen::Matrix<double,18,42> Sigma= Eigen::Matrix<double,18,42>::Zero();
+	Eigen::Matrix<double,18,44> Sigma= Eigen::Matrix<double,18,44>::Zero();
     Sigma.block(0,0,18,18)= Eigen::Matrix<double,18,18>::Identity();
-    Eigen::Matrix<double,6,42> matrixA=Jt1*Sigma;
-	Eigen::Matrix<double,6,6> eigenQ= Eigen::Matrix<double,6,6>::Identity();    //cout<<"wow"<<endl;
-    Eigen::Matrix<double,42,42> eigenQ1=  matrixA.transpose()*eigenQ* matrixA;
+    Eigen::Matrix<double,6,44> matrixA=Jt1*Sigma;
+	Eigen::Matrix<double,6,6> eigenQ= Eigen::Matrix<double,6,6>::Identity();    
+    Eigen::Matrix<double,44,44> eigenQ1=  matrixA.transpose()*eigenQ* matrixA;
 
     
     //imposto il problema quadratico
@@ -66,7 +74,7 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	aa<<Matrix<double,43,43>::Identity();
 	aa(42,42)=1;*/
 	real_2d_array a;
-	a.setlength(42,42);
+	a.setlength(44,44);
 	//a.setcontent(42,42,&eigenQ1(0,0));
 
 	 for ( int i = 0; i < eigenQ1.rows(); i++ ){
@@ -77,16 +85,16 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	
 	// Termine lineare
 	real_1d_array lineartermalglib;
-	lineartermalglib.setlength(42);
-	Eigen::Matrix<double,42,1> linearterm= -matrixA.transpose()*eigenQ.transpose()*matrixb; 
+	lineartermalglib.setlength(44);
+	Eigen::Matrix<double,44,1> linearterm= -matrixA.transpose()*eigenQ.transpose()*matrixb; 
 	 for ( int i = 0; i < linearterm.rows(); i++ ){
        for ( int j = 0; j < linearterm.cols(); j++ )
              lineartermalglib(i) = linearterm(i,j);
     }
 
     real_1d_array s;
-	s.setlength(42);
-	for(int i = 0; i< 42; i++){
+	s.setlength(44);
+	for(int i = 0; i< 44; i++){
 		
 		s(0)=1;
 	} 
@@ -146,23 +154,26 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	real_2d_array c; 
 	
 	//vincoli del problema quadratico 
-	Matrix<double,98,43> A;
+	Matrix<double,102,45> A;
      
 	//controlla i segni di kp e kd, controlla i segni della matrice A, verifica Jt1
 	
-	A<<M,-Jc_T_B,-S_T,-b,
-	   B_T_Jc, Matrix<double,12,24>::Zero(),-B.transpose()*Jcdqd,
-	   Matrix<double,20,18>::Zero(), Dfr, Matrix<double,20,13>::Zero(),
-	   Matrix<double,12,6>::Zero(), Eigen::Matrix<double,12,12>::Identity(), Matrix<double,12,24>::Zero(), ddqmax,
-	   Matrix<double,12,6>::Zero(), -Eigen::Matrix<double,12,12>::Identity(), Matrix<double,12,24>::Zero(), -ddqmin,
-       Matrix<double,12,30>::Zero(), Eigen::Matrix<double,12,12>::Identity(), tau_max,
-	   Matrix<double,12,30>::Zero(), -Eigen::Matrix<double,12,12>::Identity(), -tau_min;
-
+	A<< M,-Jc_T_B,-S_T,Matrix<double,18,2>::Zero(), -b,
+		B_T_Jc, Matrix<double,12,24>::Zero(),Matrix<double,12,2>::Zero(),-B.transpose()*Jcdqd,
+		Matrix<double,20,18>::Zero(), Dfr, Matrix<double,20,15>::Zero(),
+		Matrix<double,12,6>::Zero(), Eigen::Matrix<double,12,12>::Identity(), Matrix<double,12,26>::Zero(), ddqmax,
+		Matrix<double,12,6>::Zero(), -Eigen::Matrix<double,12,12>::Identity(), Matrix<double,12,26>::Zero(), -ddqmin,
+		Matrix<double,12,30>::Zero(), Eigen::Matrix<double,12,12>::Identity(), Matrix<double,12,2>::Zero(),tau_max,
+		Matrix<double,12,30>::Zero(), -Eigen::Matrix<double,12,12>::Identity(), Matrix<double,12,2>::Zero(),-tau_min,
+		Matrix<double,1,42>::Zero(), -m, 1, tnp,
+		Matrix<double,1,42>::Zero(), -m, 1, tnn,
+		Matrix<double,1,42>::Zero(), 1/m, 1, tnr,
+		Matrix<double,1,42>::Zero(), 1/m, 1, tns;
     
 	//cout<<"A:"<<endl;
 	//cout<<A<<endl;
 
-	c.setlength(98,43);
+	c.setlength(102,45);
 	//c.setcontent(98,43, &A(0,0));
 	 for ( int i = 0; i < A.rows(); i++ ){
 		   for ( int j = 0; j < A.cols(); j++ )
@@ -175,7 +186,7 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 
 	//parametro che imposta la tipologia del vincolo 
 	integer_1d_array ct;
-	ct.setlength(98);
+	ct.setlength(102);
 	for(int i = 0; i <30; i++){
 		ct(i) = 0;
 	}
@@ -186,11 +197,15 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	for(int i = 30; i<98; i++){
 		ct(i) = -1;
 	}
+	ct(98)= -1;
+	ct(99)= 1;
+	ct(100)= -1;
+	ct(101)= 1;
 	//box constrain
 	real_1d_array bndl;
-	bndl.setlength(43);
+	bndl.setlength(45);
 	real_1d_array bndu;
-	bndu.setlength(43);
+	bndu.setlength(45);
 	/*VectorXd qmin(12);
 	VectorXd qmax(12);
 	double dt=0.001;
@@ -249,12 +264,11 @@ for(int i = 6;i<18;i++){
     minqpsetscale(state, s);
 	// create solver, set quadratic/linear terms
 	
-    minqpcreate(42, state);
-    minqpsetquadraticterm(state, a);
+    minqpcreate(44, state);
+	minqpsetquadraticterm(state, a);
 	minqpsetlinearterm(state, lineartermalglib); //non mi servono perchè di default sono già impostati a zero
-    minqpsetlc(state, c, ct);
+	minqpsetlc(state, c, ct);
 	//minqpsetbc(state, bndl, bndu);
-	
 	minqpsetalgodenseaul(state, 1.0e-9, 1.0e+4, 15);
     minqpoptimize(state);
 
@@ -272,7 +286,7 @@ for(int i = 6;i<18;i++){
 
 //get function
 
-vector<double> PROB_QUAD::getTau(){
+vector<double> PROB_QUAD_CP::getTau(){
 
     return tau;
 }

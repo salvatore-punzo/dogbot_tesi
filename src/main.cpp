@@ -8,11 +8,16 @@
 #include <gazebo/gazebo_client.hh>
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/msgs/msgs.hh>
+#include "gazebo_msgs/ContactsState.h"
+#include "gazebo_msgs/ModelStates.h"
+#include "gazebo_msgs/GetLinkProperties.h"
+#include "gazebo_msgs/SetLinkState.h"
+#include "gazebo_msgs/LinkStates.h"
+#include "gazebo_msgs/SetModelConfiguration.h"
+#include "gazebo_msgs/SetModelState.h"
 #include <gazebo/transport/transport.hh>
 
 #include "sensor_msgs/JointState.h"
-#include "gazebo_msgs/ContactsState.h"
-#include "gazebo_msgs/ModelStates.h"
 #include "geometry_msgs/Vector3.h"
 #include "geometry_msgs/PointStamped.h"
 #include "geometry_msgs/TwistStamped.h"
@@ -34,6 +39,7 @@
 #include "poligono_supporto.h"
 #include "traj_planner.h"
 #include "capture_point.h"
+#include "prob_quadratico_cp.h"
 
 
 using namespace Eigen;
@@ -211,10 +217,13 @@ int main(int argc, char **argv){
 	PROB_QUAD *ottim;
 	ottim = new PROB_QUAD;
 
+	PROB_QUAD_CP *ottim_cp;
+	ottim_cp = new PROB_QUAD_CP;
+
 	POLI_SUP *poligono_sup;
 	poligono_sup = new POLI_SUP;  
 	
-	cout<<"prova0"<<endl;
+	
 	TrajPlanner *traiettoria;
 
 	CAPTURE_POINT *cp;
@@ -225,7 +234,7 @@ int main(int argc, char **argv){
 	//Start node
 	ros::init(argc, argv, "ros_control_node");
 	ros::NodeHandle _nh;
-	cout<<"prova00"<<endl;
+	
 	// Gazebo node 
      gazebo::transport::NodePtr node(new gazebo::transport::Node());
      node->Init();
@@ -234,7 +243,7 @@ int main(int argc, char **argv){
       ros::Rate loop_rate(1000);
       gazebo::client::setup(argc,argv);
 
-    cout<<"prova01"<<endl;
+    
 	//Subscriber
 	ros::Subscriber _jointstate_sub = _nh.subscribe ("/dogbot/joint_states", 1, Joint_cb);
 	ros::Subscriber _eebl_sub = _nh.subscribe("/dogbot/back_left_contactsensor_state",1, eebl_cb);
@@ -249,23 +258,74 @@ int main(int argc, char **argv){
 	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",1);
 	ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",1);
 	//Service 
+	ros::ServiceClient set_model_configuration_srv = _nh.serviceClient<gazebo_msgs::SetModelConfiguration>("/gazebo/set_model_configuration");
+    ros::ServiceClient set_model_state_srv = _nh.serviceClient<gazebo_msgs::SetModelState>("/gazebo/set_model_state");
 	ros::ServiceClient pauseGazebo = _nh.serviceClient<std_srvs::Empty>("/gazebo/pause_physics");
-		 cout<<"prova02"<<endl;
+		 
 	// Gazebo publisher in case the qp problem takes too long for the control loop
       gazebo::transport::PublisherPtr pub = node->Advertise<gazebo::msgs::WorldControl>("~/world_control");
-	  	cout<<"prova020"<<endl;
       pub->WaitForConnection();
-	  cout<<"prova021"<<endl;
+	  
       gazebo::msgs::WorldControl stepper;
      // Set multi-step to requested iterations
        stepper.set_step(1);
-	   cout<<"prova03"<<endl;
+	   
 
 	//Segnale di controllo
 	   std_msgs::Float64MultiArray msg_ctrl;
 
+	    // Start the robot in position (stand up) 
+      gazebo_msgs::SetModelConfiguration robot_init_config;
+      robot_init_config.request.model_name = "dogbot";
+      robot_init_config.request.urdf_param_name = "robot_description";
+      robot_init_config.request.joint_names.push_back("back_left_roll_joint");
+      robot_init_config.request.joint_names.push_back("back_left_pitch_joint");
+      robot_init_config.request.joint_names.push_back("back_left_knee_joint");
+      robot_init_config.request.joint_names.push_back("back_right_roll_joint");
+      robot_init_config.request.joint_names.push_back("back_right_pitch_joint");
+      robot_init_config.request.joint_names.push_back("back_right_knee_joint");
+      robot_init_config.request.joint_names.push_back("front_left_roll_joint");
+      robot_init_config.request.joint_names.push_back("front_left_pitch_joint");
+      robot_init_config.request.joint_names.push_back("front_left_knee_joint");
+      robot_init_config.request.joint_names.push_back("front_right_roll_joint");
+      robot_init_config.request.joint_names.push_back("front_right_pitch_joint");
+      robot_init_config.request.joint_names.push_back("front_right_knee_joint");
+      robot_init_config.request.joint_positions.push_back(0.0037);
+      robot_init_config.request.joint_positions.push_back(-0.8426);
+      robot_init_config.request.joint_positions.push_back(-1.6216);
+      robot_init_config.request.joint_positions.push_back(0.0039);
+      robot_init_config.request.joint_positions.push_back(0.8421);
+      robot_init_config.request.joint_positions.push_back(1.6165);
+      robot_init_config.request.joint_positions.push_back(-0.0032);
+      robot_init_config.request.joint_positions.push_back(-0.847);
+      robot_init_config.request.joint_positions.push_back(-1.6302);
+      robot_init_config.request.joint_positions.push_back(-0.0034);
+      robot_init_config.request.joint_positions.push_back(0.8467);
+      robot_init_config.request.joint_positions.push_back(1.6256);
+      if(set_model_configuration_srv.call(robot_init_config))
+        ROS_INFO("Robot configuration set.");
+      else
+        ROS_INFO("Failed to set robot configuration.");
+
+      gazebo_msgs::SetModelState robot_init_state;
+      robot_init_state.request.model_state.model_name = "dogbot";
+      robot_init_state.request.model_state.reference_frame = "world";
+      robot_init_state.request.model_state.pose.position.x=-0.00182;
+      robot_init_state.request.model_state.pose.position.y=-0.0106414;
+      robot_init_state.request.model_state.pose.position.z=0.426005;
+      robot_init_state.request.model_state.pose.orientation.x=0.0;
+      robot_init_state.request.model_state.pose.orientation.y=0.0;
+      robot_init_state.request.model_state.pose.orientation.z=0.0;
+      robot_init_state.request.model_state.pose.orientation.w=0.0;
+      if(set_model_state_srv.call(robot_init_state))
+        ROS_INFO("Robot state set.");
+      else
+        ROS_INFO("Failed to set robot state.");
+
+	   
+	   
 	   std_srvs::Empty pauseSrv;
-		 cout<<"prova04"<<endl;
+		 
 		 while(!joint_state_available && !joint_base_available )
     {
         ROS_INFO_STREAM_ONCE("Robot/object state not available yet.");
@@ -364,7 +424,7 @@ int main(int argc, char **argv){
 				cout<<"he: "<<endl<<he<<endl;
 				cout<<"coordinate ee bl: "<<endl<<coo_ee_bl<<endl;
 				*/
-				//poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
+				poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
 				//coefficinete angolare
 				float m = poligono_sup->getm();
 				//intercetta verticale
@@ -372,22 +432,25 @@ int main(int argc, char **argv){
 				float q_negative = poligono_sup->getq_newn();
 				float q_s = poligono_sup->getqs();
 				float q_r = poligono_sup->getqr();
-				
+				/*
 				cout<<"mm: "<<m<<endl;
 				cout<<"qsm: "<<q_s<<endl;
 				cout<<"qrm: "<<q_r<<endl;
-				
+				*/
 			
 				//stampo giunti che passo al controllo ottimo
 				for (int i=0; i<18; i++){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
 				}
 
-				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
-				vector<double> tau = ottim->getTau();
-				cout<<"wow"<<endl;
+				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
+				//vector<double> tau = ottim->getTau();
+				
+				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot, m, q_positive, q_negative, q_s, q_r);
+				vector<double> tau = ottim_cp->getTau();
+				
 				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
-				cout<<"wow1"<<endl;
+				
 				//--------------------pubblico le coppie calcolate --------------------
 				
 				//vector<double> tau = cp->getTau();

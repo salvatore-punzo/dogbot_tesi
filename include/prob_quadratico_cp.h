@@ -1,4 +1,3 @@
-
 #include "ros/ros.h"
 #include <iostream>
 #include <vector>
@@ -23,10 +22,10 @@ using namespace Eigen;
 using namespace alglib;
 using namespace std;
 
-class PROB_QUAD{
+class PROB_QUAD_CP{
     public:
-        PROB_QUAD();
-        void CalcoloProbOttimo(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot);
+        PROB_QUAD_CP();
+        void CalcoloProbOttimoCP(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot,  float &m, float &q_plus, float &q_minus, float &qs, float &qr);
         //get function
         vector<double> getTau();
 
@@ -50,6 +49,10 @@ class PROB_QUAD{
 	Matrix<double,6,6> kp = 2500*MatrixXd::Identity(6,6);
 	Matrix<double,6,6> kd = 50*MatrixXd::Identity(6,6); //2*sqrt(kp);
     double com_zdes = 0.4;
+	double tnp,tnn, tnr, tns;
+	float w;//eigenfrequency
+	double dt=0.001;
+	double Dt=10*dt;
 
     vector<double> tau;
 /*
