@@ -387,19 +387,17 @@ int main(int argc, char **argv){
 				cout<<"gravity1"<<endl<<gravity1<<endl;
 				*/
 				doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
-			
 				VectorXd b=doggo->getBiasMatrix();
 				Matrix<double,18,18> M=doggo->getMassMatrix();
 				Matrix<double,24,18> Jc=doggo->getJacobian();
 				Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
 				Matrix<double,18,18> T=doggo->getTransMatrix();
 				Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
-			    Matrix<double,6,18> Jcom=doggo->getJCOMMatrix();
-                Matrix<double,6,18> Jcomdot=doggo->getJCOMDot();
-				MatrixXd com_pos=doggo->getCOMpos();
+			    Matrix<double,6,18> Jcom=doggo->getJCOMMatrix();				
+                Matrix<double,6,18> Jcomdot=doggo->getJCOMDot();				
+				MatrixXd com_pos=doggo->getCOMpos();				
                 MatrixXd com_vel=doggo->getCOMvel();
-				//cout<<"b:"<<endl<<b<<endl;
-
+				//cout<<"b:"<<endl<<b<<endl;				
 				// Time
          		t = (ros::Time::now()-begin).toSec();
          		int idx= std::round( t*1000);
@@ -425,6 +423,7 @@ int main(int argc, char **argv){
 				cout<<"coordinate ee bl: "<<endl<<coo_ee_bl<<endl;
 				*/
 				poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
+			
 				//coefficinete angolare
 				float m = poligono_sup->getm();
 				//intercetta verticale
@@ -445,10 +444,9 @@ int main(int argc, char **argv){
 
 				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
 				//vector<double> tau = ottim->getTau();
-				
+
 				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot, m, q_positive, q_negative, q_s, q_r);
-				vector<double> tau = ottim_cp->getTau();
-				
+				vector<double> tau = ottim_cp->getTau();				
 				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
 				
 				//--------------------pubblico le coppie calcolate --------------------

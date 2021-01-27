@@ -1,6 +1,7 @@
 #include "quadruped.h"
 #include "alglib/optimization.h"
 #include "Td_matrix.cpp"
+
 QUADRUPED::QUADRUPED()
 {
 };
@@ -11,7 +12,7 @@ QUADRUPED::QUADRUPED(std::string modelFile)
 	// Create the robot 
 	createrobot(modelFile);
     model = kinDynComp.model();
-	std::cout<<"h1"<<endl;
+	
 	// Resize matrices of the class given the number of DOFs
     n=model.getNrOfDOFs();
     robot_mass=model.getTotalMass();
@@ -30,12 +31,12 @@ QUADRUPED::QUADRUPED(std::string modelFile)
     Jcom=iDynTree::MatrixDynSize(3,6+n);
 	Jb=iDynTree::MatrixDynSize(6,6+n);
 	Jcomdot=iDynTree::MatrixDynSize(6,6+n);
-	Jac=iDynTree::MatrixDynSize(24,6+n);
-	JacDot=iDynTree::MatrixDynSize(24,6+n);	
+	Jac=iDynTree::MatrixDynSize(24,6+n);	
+	JacDot=iDynTree::MatrixDynSize(24,6+n);
 	Jdqd=iDynTree::MatrixDynSize(24,1);
     T=iDynTree::MatrixDynSize(6+n,6+n);
 	T_inv_dot=iDynTree::MatrixDynSize(6+n,6+n);
-	T_dot=iDynTree::MatrixDynSize(6+n,6+n);
+	T_dot=iDynTree::MatrixDynSize(6+n,6+n);//sp
     MassMatrixCOM=iDynTree::FreeFloatingMassMatrix(model) ;
     BiasCOM=iDynTree::VectorDynSize(n+6);
 	GravMatrixCOM=iDynTree::MatrixDynSize(n+6,1);
@@ -53,67 +54,59 @@ void QUADRUPED::update (Eigen::Matrix4d &eigenWorld_H_base, Eigen::VectorXd &eig
 {   
 
    // Update joints, base and gravity from inputs
-	std::cout<<"h2"<<endl;
+	
 	 iDynTree::fromEigen(world_H_base,eigenWorld_H_base);
-	 std::cout<<"h21"<<endl;
      iDynTree::toEigen(jointPos) = eigenJointPos;
-	 std::cout<<"h22"<<endl;
      iDynTree::fromEigen(baseVel,eigenBasevel);
-	 std::cout<<"h23"<<endl;
      toEigen(jointVel) = eigenJointVel;
      toEigen(gravity)  = eigenGravity;
 
-	std::cout<<"h3"<<endl;
 	//Set the state for the robot 
-	
 	 kinDynComp.setRobotState(world_H_base,jointPos,
                               baseVel,jointVel,gravity);
-	std::cout<<"h4"<<endl;
-  
+
+
+
+    // Compute Center of Mass
+     iDynTree::Vector3 base_angle=world_H_base.getRotation().asRPY();
+     toEigen(CoM)<<toEigen(kinDynComp.getCenterOfMassPosition()),
+	               toEigen(base_angle);
+		   
+	//Compute velocity of the center of mass
+
+    Eigen::Matrix<double,3,1> CoM_vel_lin=toEigen(kinDynComp.getCenterOfMassVelocity());
+	Eigen::Matrix<double,3,1> CoM_vel_ang=eigenBasevel.block(3,0,3,1);
+
+	toEigen(CoM_vel)<<CoM_vel_lin,
+	                  CoM_vel_ang;
+		   
     // Compute position base +joints
-	iDynTree::Vector3 base_angle=world_H_base.getRotation().asRPY();
 	toEigen(qb)<<toEigen(world_H_base.getPosition()),
 	            toEigen(base_angle),
 	            eigenJointPos;
+
+    // Compute position COM+joints
+	toEigen(q)<<toEigen(CoM),
+	            eigenJointPos;
+
+	// Compute velocity COM+joints
+
+	toEigen(dq)<<toEigen(CoM_vel),
+	             eigenJointVel;
 
 	// Compute velocity base+joints
 
 	toEigen(dqb)<<eigenBasevel,
 	             eigenJointVel;
 
-std::cout<<"h5"<<endl;
-    // Compute Center of Mass
-     
-     toEigen(CoM)<<toEigen(kinDynComp.getCenterOfMassPosition()),
-	               toEigen(base_angle);
-				   
-	//Compute velocity of the center of mass
-    Eigen::Matrix<double,3,1> CoM_vel_lin=toEigen(kinDynComp.getCenterOfMassVelocity());
-	Eigen::Matrix<double,3,1> CoM_vel_ang=eigenBasevel.block(3,0,3,1);
-
-	toEigen(CoM_vel)<<CoM_vel_lin,
-	                  CoM_vel_ang;
-
-    // Compute position
-	toEigen(q)<<toEigen(CoM),
-	            eigenJointPos;
-	// Compute velocity 
-
-	toEigen(dq)<<toEigen(CoM_vel),
-	             eigenJointVel;
 
 	// Joint limits
 
     toEigen(qmin)<<-1.75 , -1.75,-1.75,-1.75,-3.15, -0.02, -1.58, -2.62,  -1.58, -2.62, -3.15, -0.02;
     toEigen(qmax)<<1.75, 1.75, 1.75, 1.75, 1.58, 2.62, 3.15, 0.02,  3.15, 0.02, 1.58, 2.62;
-	
-
-
-
 
 	// Get mass, bias (C(q,v)*v+g(q)) and gravity (g(q)) matrices
         //Initialize ausiliary vector
-	
 	     iDynTree::FreeFloatingGeneralizedTorques bias_force(model);
 	     iDynTree::FreeFloatingGeneralizedTorques grav_force(model);
 	
@@ -136,37 +129,33 @@ std::cout<<"h5"<<endl;
 	                        iDynTree::toEigen(grav_force.jointTorques());
 
 	  //Compute Jacobian term
+
+	     computeJac();	
 	
-	     computeJac();
-	 
 	  // Compute Bias Acceleration -> J_dot*q_dot
-	
 	     computeJacDotQDot();
+
 	  // Velocity vector (base+joints)
 	     Eigen::Matrix<double, 18,1> q_dot;
 	               
          q_dot<< eigenBasevel,
 	             eigenJointVel;
-	
-	 
+    
+	  // Compute Jacobian derivative
+	     computeJacDot(q_dot);
+
+
 	  // Compute Matrix needed for transformation from floating base representation to CoM representation
-	
+
 	     computeTransformation(q_dot);
-	    
-	   Eigen::Matrix<double,18,1> dqtrans=toEigen(T)*q_dot;
-	   /*
-       std::cout<<"q"<<q_dot<<std::endl;
-       std::cout<<"q"<<toEigen(dq)<<std::endl;
-	   std::cout<<"qtrans"<<dqtrans<<std::endl;
-	   */
-	  // Compute Mass Matrix in CoM representation
-	 
+
+	  // Compute Mass Matrix in CoM representation 
 	     toEigen(MassMatrixCOM)=toEigen(T).transpose().inverse()*toEigen(MassMatrix)*toEigen(T).inverse();
 
 
 	  // Compute Coriolis+gravitational term in CoM representation
 	
-	     toEigen(BiasCOM)=toEigen(T).transpose().inverse()*toEigen(Bias)+toEigen(T).transpose().inverse()*toEigen(MassMatrix)*toEigen(T_inv_dot)*q_dot;
+	     toEigen(BiasCOM)=toEigen(T).transpose().inverse()*toEigen(Bias)+toEigen(T).transpose().inverse()*toEigen(MassMatrix)*toEigen(T_inv_dot)*toEigen(dq);
 
 	  // Compute gravitational term in CoM representation
 	
@@ -176,16 +165,20 @@ std::cout<<"h5"<<endl;
 	  
 	     toEigen(JacCOM)=toEigen(Jac)*toEigen(T).inverse();
 	
+	     ComputeJaclinear();
+
 	  // Compute Bias Acceleration -> J_dot*q_dot  in CoM representation
 	
-	     toEigen(JdqdCOM)=toEigen(Jdqd)+toEigen(Jac)*toEigen(T_inv_dot)*q_dot;
+	     toEigen(JdqdCOM)=toEigen(JacDot)*toEigen(dq)+toEigen(Jac)*toEigen(T_inv_dot)*toEigen(dq);
 	  
+	     computeJdqdCOMlinear();
 	
-      
+
   
 	
 }
 
+// create robot
 void QUADRUPED::createrobot(std::string modelFile)
 {  bool ok = mdlLoader.loadModelFromFile(modelFile);
 
@@ -224,16 +217,16 @@ void  QUADRUPED::computeJac()
 	
 	   // Jacobian for back right leg
        kinDynComp.getFrameFreeFloatingJacobian(8,Jac1);
-	
+
 	   // Jacobian for back left leg
 	   kinDynComp.getFrameFreeFloatingJacobian(11,Jac2);
-	
+
 	  // Jacobian for front left leg
 	  kinDynComp.getFrameFreeFloatingJacobian(14,Jac3);
-	
+
 	  // Jacobian for front right leg
 	  kinDynComp.getFrameFreeFloatingJacobian(17,Jac4);
-	
+
 	 // Full Jacobian
 	 toEigen(Jac)<<toEigen(Jac1),
 	               toEigen(Jac2),
@@ -242,7 +235,17 @@ void  QUADRUPED::computeJac()
 	
 }
 
+void QUADRUPED::ComputeJaclinear()
+{
+  Eigen::Matrix<double,12,24> B;
+  B<< Eigen::MatrixXd::Identity(3,3) , Eigen::MatrixXd::Zero(3,21),
+      Eigen::MatrixXd::Zero(3,6), Eigen::MatrixXd::Identity(3,3), Eigen::MatrixXd::Zero(3,15),
+	  Eigen::MatrixXd::Zero(3,12), Eigen::MatrixXd::Identity(3,3),  Eigen::MatrixXd::Zero(3,9),
+	  Eigen::MatrixXd::Zero(3,18), Eigen::MatrixXd::Identity(3,3), Eigen::MatrixXd::Zero(3,3);
 
+  toEigen(JacCOM_lin)=B*toEigen(JacCOM);
+
+}
 
 // Compute Bias acceleration: J_dot*q_dot
 void  QUADRUPED::computeJacDotQDot()
@@ -399,6 +402,20 @@ Eigen::VectorXd QUADRUPED::getPartialDerivativeJac(const Eigen::MatrixXd Jacobia
 }
 
 
+void QUADRUPED::computeJdqdCOMlinear()
+{
+	Eigen::Matrix<double,12,24> B;
+    B<< Eigen::MatrixXd::Identity(3,3) , Eigen::MatrixXd::Zero(3,21),
+      Eigen::MatrixXd::Zero(3,6), Eigen::MatrixXd::Identity(3,3), Eigen::MatrixXd::Zero(3,15),
+	  Eigen::MatrixXd::Zero(3,12), Eigen::MatrixXd::Identity(3,3),  Eigen::MatrixXd::Zero(3,9),
+	  Eigen::MatrixXd::Zero(3,18), Eigen::MatrixXd::Identity(3,3), Eigen::MatrixXd::Zero(3,3);
+
+
+    toEigen(JdqdCOM_lin)= Eigen::MatrixXd::Zero(12,1);
+    toEigen(JdqdCOM_lin)=B*toEigen(JdqdCOM);
+	
+}
+
 
 // Compute matrix transformation T needed to recompute matrices/vector after the coordinate transform to the CoM
 void QUADRUPED::computeTransformation(Eigen::VectorXd Vel_)
@@ -460,29 +477,23 @@ void QUADRUPED::computeTransformation(Eigen::VectorXd Vel_)
 	  TDMAT Tj(toEigen(qb),toEigen(dqb));
 	  Eigen::Matrix<double,3,12> Jbcdot=Tj.getTdmatrix();
 
-	   // T_inv_dot matrix
+	   // Tdot matrix
 	   toEigen(T_inv_dot)<<Eigen::MatrixXd::Zero(3,3), toEigen(xbc_hat_dot), Jbcdot,
                       Eigen::MatrixXd::Zero(15,18);
-
-
-	   //Tdot matrix
+	
+	//Tdot matrix cambiano i segni
 	   toEigen(T_dot)<<Eigen::MatrixXd::Zero(3,3), -toEigen(xbc_hat_dot), -Jbcdot,
                       Eigen::MatrixXd::Zero(15,18);
-	
-   
-     toEigen(Jcomdot)<<Eigen::MatrixXd::Zero(3,3),  -toEigen(xbc_hat_dot), -Jbcdot,
-	                   Eigen::MatrixXd::Zero(3,6+n);
 }
 
 
 // return Mass Matrix
 Eigen::MatrixXd QUADRUPED::getMassMatrix()
 {
-	Eigen::MatrixXd massMatrix = iDynTree::toEigen(MassMatrix);
-	return massMatrix;
+	
+	return toEigen(MassMatrix);
 
 }
-
 //return Jcom Matrix
 Eigen::MatrixXd QUADRUPED::getJCOMMatrix()
 {
@@ -500,20 +511,19 @@ Eigen::MatrixXd QUADRUPED::getJCOMDot()
 	return J_com;
 
 }
-
 //return Bias Matrix
 Eigen::VectorXd QUADRUPED::getBiasMatrix()
 {
-	Eigen::VectorXd coriolis = iDynTree::toEigen(Bias);
-	return coriolis;
+
+	return toEigen(Bias);
 
 }
 
 //return gravity term
 Eigen::VectorXd QUADRUPED::getGravityMatrix()
 {
-	Eigen::VectorXd grav_term = iDynTree::toEigen(GravMatrix);
-	return grav_term;
+	
+	return toEigen(GravMatrix);
 
 }
 
@@ -521,8 +531,8 @@ Eigen::VectorXd QUADRUPED::getGravityMatrix()
 //return Jacobian
 Eigen::MatrixXd QUADRUPED::getJacobian()
 {
-	Eigen::Matrix<double,24,18> Jacobian = iDynTree::toEigen(Jac);
-	return Jacobian;
+	
+	return toEigen(Jac);
 
 }
 
@@ -530,16 +540,24 @@ Eigen::MatrixXd QUADRUPED::getJacobian()
 //return Bias Acceleration --> J_dot*q_dot
 Eigen::MatrixXd QUADRUPED::getBiasAcc()
 {
-	Eigen::Matrix<double,24,1> BiasAcc = iDynTree::toEigen(Jdqd);
-	return BiasAcc;
+
+	return toEigen(Jdqd);
 
 }
 
 //return matrix T
 Eigen::MatrixXd QUADRUPED::getTransMatrix()
 {
-	Eigen::Matrix<double,18,18> trans = iDynTree::toEigen(T);
-	return trans;
+
+	return toEigen(T);
+
+}
+
+// return Mass Matrix in COM representation
+Eigen::MatrixXd QUADRUPED::getMassMatrixCOM()
+{
+	
+	return toEigen(MassMatrixCOM);
 
 }
 //return matrix T_dot 
@@ -550,28 +568,19 @@ Eigen::MatrixXd QUADRUPED::getTdotMatrix()
 
 }
 
-// return Mass Matrix in COM representation
-Eigen::MatrixXd QUADRUPED::getMassMatrixCOM()
-{
-	Eigen::MatrixXd massMatrix = iDynTree::toEigen(MassMatrixCOM);
-	return massMatrix;
-
-}
-
-
 //return Bias Matrix in COM representation
 Eigen::VectorXd QUADRUPED::getBiasMatrixCOM()
 {
-	Eigen::VectorXd coriolis = iDynTree::toEigen(BiasCOM);
-	return coriolis;
+	
+	return toEigen(BiasCOM);
 
 }
 
 //return gravity term in COM representation
 Eigen::VectorXd QUADRUPED::getGravityMatrixCOM()
 {
-	Eigen::VectorXd grav_term = iDynTree::toEigen(GravMatrixCOM);
-	return grav_term;
+
+	return toEigen(GravMatrixCOM);
 
 }
 
@@ -579,21 +588,16 @@ Eigen::VectorXd QUADRUPED::getGravityMatrixCOM()
 //return Jacobian in COM representation
 Eigen::MatrixXd QUADRUPED::getJacobianCOM()
 {
-	Eigen::Matrix<double,24,18> Jacobian = iDynTree::toEigen(JacCOM);
-	return Jacobian;
+
+	return toEigen(JacCOM);
 
 }
 
 Eigen::MatrixXd QUADRUPED::getJacobianCOM_linear()
 {
-
-	for (int i=0; i<4; ++i)
-	{
-       toEigen(JacCOM_lin).block(0+3*i,0,3,18)=toEigen(JacCOM).block(0+6*i,0,3,18);
-	}
     
-	Eigen::Matrix<double,12,18> Jacobian_lin = iDynTree::toEigen(JacCOM_lin);
-	return Jacobian_lin;
+
+	return toEigen(JacCOM_lin);
 
 }
 
@@ -601,38 +605,31 @@ Eigen::MatrixXd QUADRUPED::getJacobianCOM_linear()
 //return Bias Acceleration --> J_dot*q_dot in COM representation
 Eigen::MatrixXd QUADRUPED::getBiasAccCOM()
 {
-	Eigen::Matrix<double,24,1> BiasAcc = iDynTree::toEigen(JdqdCOM);
-	return BiasAcc;
+	
+	return toEigen(JdqdCOM);
 
 }
 
-
+// Return Bias accelration in CoM representation
 Eigen::MatrixXd QUADRUPED::getBiasAccCOM_linear()
 {
-
-	for (int i=0; i<4; ++i)
-	{
-       toEigen(JdqdCOM_lin).block(0+3*i,0,3,1)=toEigen(JdqdCOM).block(0+6*i,0,3,1);
-	}
-    
-	Eigen::Matrix<double,12,1> Jacobian_lin = iDynTree::toEigen(JdqdCOM_lin);
-	return Jacobian_lin;
+	return toEigen(JdqdCOM_lin);
 
 }
 
 
 Eigen::MatrixXd QUADRUPED::getCOMpos()
 {
- Eigen::Matrix<double,6,1> COMpos= iDynTree::toEigen(CoM);
+
 	
- return COMpos;
+ return toEigen(CoM);
 }
   
   
 Eigen::MatrixXd QUADRUPED::getCOMvel()
 {
- Eigen::Matrix<double,6,1> COMvel= iDynTree::toEigen(CoM_vel);
- return COMvel;
+
+ return toEigen(CoM_vel);
 
 }
 
@@ -651,18 +648,280 @@ int QUADRUPED::getDoFsnumber()
 
 Eigen::MatrixXd QUADRUPED::getMassMatrixCOM_com()
 {
-	Eigen::MatrixXd massMatrix = iDynTree::toEigen(MassMatrixCOM).block(0,0,6,6);
-	return massMatrix;
+
+	return toEigen(MassMatrixCOM).block(0,0,6,6);
    
 }
 
 
 Eigen::MatrixXd QUADRUPED::getMassMatrixCOM_joints()
 {
-    Eigen::MatrixXd massMatrix = iDynTree::toEigen(MassMatrixCOM).block(6,6,n,n);
-	return massMatrix;
+   
+	return toEigen(MassMatrixCOM).block(6,6,n,n);
 }
 
 
+// Quadratic problem
+Eigen::VectorXd QUADRUPED::qpproblem( Eigen::Matrix<double,6,1> &Wcom_des)
+{
+	/* //termini noti del problema quadratico
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_plus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_minus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+   	tnr = 2*w/(pow(Dt,2)*w + 2 * Dt) * (qr + (-1/m) * com_pos(0) +(-1/m) * com_vel(0) * Dt  +(-1/m) *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	tns = 2*w/(pow(Dt,2)*w + 2 * Dt) * (qs + (-1/m) * com_pos(0) +(-1/m) * com_vel(0) * Dt  +(-1/m) *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	*/
 
+	// Set variables
+   int variables=30;
+   alglib::real_2d_array Q, R, L;
+   alglib::real_1d_array c, bl, bu;
+   alglib::integer_1d_array Lt;
+   
+   Q.setlength(variables,variables);
+   c.setlength(variables);
+   bl.setlength(variables);
+   bu.setlength(variables);
+   L.setlength(58,31);
+   Lt.setlength(58);
+
+
+   // Taking Jacobian for CoM and joints
+   Eigen::Matrix<double, 12, 6> Jstcom= toEigen(JacCOM_lin).block(0,0,12,6);
+   Eigen::Matrix<double, 12, 12> Jstj= toEigen(JacCOM_lin).block(0,6,12,12);
+
+   // cost function quadratic matrix
+   Eigen::Matrix<double,12,30> Sigma= Eigen::Matrix<double,12,30>::Zero();
+   Sigma.block(0,18,12,12)= Eigen::Matrix<double,12,12>::Identity();
+   
+   Eigen::Matrix<double,6,30>  T_s= Jstcom.transpose()*Sigma;
+
+   Eigen::Matrix<double,6,6> eigenQ1= 50*Eigen::Matrix<double,6,6>::Identity();
+   Eigen::Matrix<double,30,30> eigenQ2= T_s.transpose()*eigenQ1*T_s;
+   Eigen::Matrix<double,30,30> eigenQ= eigenQ2+Eigen::Matrix<double,30,30>::Identity();
+ 
+
+	 
+   for ( int i = 0; i < eigenQ.rows(); i++ ){
+        for ( int j = 0; j < eigenQ.cols(); j++ )
+             Q(i,j) = eigenQ(i,j);
+    } 
+
+    // cost function linear matrix
+	Eigen::Matrix<double,30,1> eigenc= -T_s.transpose()*eigenQ1.transpose()*Wcom_des; 
+
+   for ( int i = 0; i < eigenc.rows(); i++ ){
+       for ( int j = 0; j < eigenc.cols(); j++ )
+             c(i) = eigenc(i,j);
+    }
+
+
+
+
+    alglib::minqpstate state;
+	// Create QP optimizer
+    alglib::minqpcreate(30,state);
+	alglib::minqpsetquadraticterm( state,Q);
+    alglib::minqpsetlinearterm(state,c);
+	
+	
+
+	//Equality constraints
+	Eigen::Matrix<double,18, 30> eigenA= Eigen::Matrix<double,18,30>::Zero();
+	
+	eigenA.block(0,0,6,6)=toEigen(MassMatrixCOM).block(0,0,6,6);
+
+	eigenA.block(0,18,6,12)=-Jstcom.transpose();
+
+    eigenA.block(6,0,12,6)=Jstcom;
+
+    eigenA.block(6,6,12,12)=Jstj;
+
+    // Known term
+    Eigen::Matrix<double,18, 1> eigenb= Eigen::Matrix<double,18,1>::Zero();
+
+    Eigen::Matrix<double,1,6> grav;
+	grav<<0,0,9.8,0,0,0;
+	eigenb.block(0,0,6,1)=-toEigen(BiasCOM).block(0,0,6,1);;
+
+	eigenb.block(6,0,12,1)=-toEigen(JdqdCOM_lin);
+
+
+    
+    
+
+	//Inequality Constraints
+
+	Eigen::Matrix<double,40, 30> eigenD= Eigen::Matrix<double,40,30>::Zero();
+	
+	 // Torque limits
+	eigenD.block(16,6,12,12)=toEigen(MassMatrixCOM).block(6,6,12,12);
+
+    eigenD.block(16,18,12,12)=-Jstj.transpose();
+
+	eigenD.block(28,6,12,12)=-toEigen(MassMatrixCOM).block(6,6,12,12);
+
+    eigenD.block(28,18,12,12)=Jstj.transpose();
+
+	
+
+	//Friction
+	   double mu=1;
+	   Eigen::Matrix<double,3, 1> n= Eigen::Matrix<double,3,1>::Zero();
+	   n<< 0,
+	       0,
+		   1;
+
+	   Eigen::Matrix<double,3, 1> t1= Eigen::Matrix<double,3,1>::Zero();
+	   t1<< 1,
+	       0,
+		   0;
+
+       Eigen::Matrix<double,3, 1> t2= Eigen::Matrix<double,3,1>::Zero();
+	   t2<<0,
+	       1,
+		   0;
+
+	   Eigen::Matrix<double,4,3> cfr=Eigen::Matrix<double,4,3>::Zero();
+  
+	   cfr<<(-mu*n+t1).transpose(),
+	        (-mu*n+t2).transpose(),
+			-(mu*n+t1).transpose(),
+			-(mu*n+t2).transpose();
+     
+	    Eigen::Matrix<double,16,12> Dfr=Eigen::Matrix<double,16,12>::Zero();
+
+		for(int i=0; i<4; i++)
+		{
+			Dfr.block(0+4*i,0+3*i,4,3)=cfr;
+		}
+		
+
+    eigenD.block(0,18,16,12)=Dfr;
+
+
+    // Known terms for inequality
+	Eigen::Matrix<double,40, 1> eigenC= Eigen::Matrix<double,40,1>::Zero();
+	
+	// Torque limits
+    Eigen::Matrix<double,12,1> tau_max=60*Eigen::Matrix<double,12,1>::Ones();
+	Eigen::Matrix<double,12,1> tau_min=-60*Eigen::Matrix<double,12,1>::Ones();
+
+    Eigen::Matrix<double,12, 1> eigenBiascom=toEigen(BiasCOM).block(6,0,12,1);
+
+	eigenC.block(16,0,12,1)=tau_max-eigenBiascom;
+	eigenC.block(28,0,12,1)=-(tau_min-eigenBiascom);
+    
+      // Joints limits
+     double deltat=0.01;
+     Eigen::Matrix<double,12, 1> eigenq=toEigen(q).block(6,0,12,1);
+	 Eigen::Matrix<double,12, 1> eigendq=toEigen(dq).block(6,0,12,1);
+	 Eigen::Matrix<double,12, 1> eigenqmin=toEigen(qmin);
+	 Eigen::Matrix<double,12, 1> eigenqmax=toEigen(qmax);
+	 Eigen::Matrix<double,12, 1> ddqmin=(2/pow(deltat,2))*(eigenqmin-eigenq-deltat*eigendq);
+	 Eigen::Matrix<double,12, 1> ddqmax=(2/pow(deltat,2))*(eigenqmax-eigenq-deltat*eigendq);
+
+   /* 
+   // aggiungi ad eigenL questi vincoli
+   Matrix<double,1,42>::Zero(), -m, 1, tnp,
+		Matrix<double,1,42>::Zero(), -m, 1, tnn,
+		Matrix<double,1,42>::Zero(), 1/m, 1, tnr,
+		Matrix<double,1,42>::Zero(), 1/m, 1, tns;
+	*/
+	
+	
+     //Linear constraints matrix
+    Eigen::Matrix<double,58, 31> eigenL= Eigen::Matrix<double,58,31>::Zero();
+
+	eigenL<< eigenA,eigenb,
+	         eigenD, eigenC;/*
+			 -m,1,Eigen::Matrix<double,1,28>,tnp,
+			 -m,1,Eigen::Matrix<double,1,28>,tnn,
+			 1/m,1,Eigen::Matrix<double,1,28>,tnr,
+			 1/m,1,Eigen::Matrix<double,1,28>,tns;
+*/
+    
+    
+   
+    for ( int i = 0; i < eigenL.rows(); i++ ){
+		 if (i < 18)
+            {
+				Lt(i) = 0.0; 
+			}
+        else
+           {
+            Lt(i) = -1.0; 
+		   }
+		   for ( int j = 0; j < eigenL.cols(); j++ )
+             L(i,j) = eigenL(i,j);
+    }
+   /*
+    //Vincoli aggiuntivi per capture point
+	Lt(58)= -1;
+	Lt(59)= 1;
+	Lt(60)= -1;
+	Lt(61)= 1;
+*/
+    //Bounded constraints
+     Eigen::Matrix<double,30, 1> eigenBL= Eigen::Matrix<double,30,1>::Zero();
+     
+	 eigenBL.block(6,0,12,1)=ddqmin;
+
+     Eigen::Matrix<double,30, 1> eigenBU= Eigen::Matrix<double,30,1>::Zero();
+	
+	 eigenBU.block(6,0,12,1)=ddqmax;
+
+     for ( int i = 0; i < 30; i++ )
+    {  
+		if (i<6)
+	  {
+       bl(i) = alglib::fp_neginf;
+       bu(i) = alglib::fp_posinf;
+	   }
+       else if (i>=6 && i<18)
+	   { bl(i) = eigenBL(i,0);
+	     bu(i) = eigenBU(i,0);
+	    }
+		else
+		{
+	    bl(i) = alglib::fp_neginf;
+        bu(i) = alglib::fp_posinf;
+
+		}
+    };
+
+    bl(20)=0;
+    bl(23)=0;
+    bl(26)=0;
+	bl(29)=0;
+
+
+    
+    // Set qp
+    alglib::minqpsetbc(state, bl, bu);
+    alglib::minqpsetlc(state, L, Lt);
+	alglib::minqpsetscaleautodiag(state);
+	alglib::real_1d_array x_;
+    
+    alglib::minqpreport rep;
+	alglib::minqpsetalgodenseaul(state, 1.0e-9, 1.0e+4, 15);
+
+
+    alglib::minqpoptimize(state);
+
+	// Solve qp
+    alglib::minqpresults(state, x_, rep);
+
+    Eigen::VectorXd x_eigen= Eigen::VectorXd::Zero(30) ;
+	for ( int j = 0; j < x_eigen.size(); j++ )
+             x_eigen(j)=x_(j);
+
+
+
+
+    
+	Eigen::VectorXd tau= Eigen::VectorXd::Zero(12);
+	tau=toEigen(MassMatrixCOM).block(6,6,12,12)*x_eigen.block(6,0,12,1)+eigenBiascom-Jstj.transpose()*x_eigen.block(18,0,12,1);
+	return tau;
+
+}
 

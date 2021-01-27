@@ -152,6 +152,7 @@ src/traj_planner.cpp
 src/capture_point.cpp
 src/prob_quadratico_cp.cpp
 
+
 src/alglib/ap.cpp
 src/alglib/alglibinternal.cpp
 src/alglib/alglibmisc.cpp
@@ -179,6 +180,7 @@ src/prob_quadratico.cpp
 src/traj_planner.cpp
 src/capture_point.cpp
 src/prob_quadratico_cp.cpp
+
 
 src/alglib/ap.cpp
 src/alglib/alglibinternal.cpp

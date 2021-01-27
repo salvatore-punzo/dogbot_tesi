@@ -5,8 +5,7 @@
 #include <iostream>
 #include <cmath>
 // Eigen headers 
-//#include <Eigen/Core>
-#include "eigen3/Eigen/Core"
+#include <Eigen/Core>
 
 // iDynTree headers
 #include <iDynTree/Model/FreeFloatingState.h>
@@ -29,7 +28,9 @@ class QUADRUPED
   // update the robot state
 	void update(Eigen::Matrix4d &eigenWorld_H_base, Eigen::VectorXd &eigenJointPos, Eigen::VectorXd &eigenJointVel, Eigen::Matrix<double,6,1> &eigenBasevel, Eigen::Vector3d &eigenGravity);			
   
-  
+  // Solve quadratic problem for contact forces
+  Eigen::VectorXd qpproblem( Eigen::Matrix<double,6,1> &Wcom_des);
+
   // get function
 	Eigen::VectorXd getBiasMatrix();
 	Eigen::VectorXd getGravityMatrix();
@@ -37,9 +38,6 @@ class QUADRUPED
   Eigen::MatrixXd getJacobian();
   Eigen::MatrixXd getBiasAcc();
   Eigen::MatrixXd getTransMatrix();
-
-  Eigen::MatrixXd getTdotMatrix();
-  
   Eigen::VectorXd getBiasMatrixCOM();
 	Eigen::VectorXd getGravityMatrixCOM();
 	Eigen::MatrixXd getMassMatrixCOM();
@@ -51,9 +49,10 @@ class QUADRUPED
   Eigen::MatrixXd getBiasAccCOM_linear();
   Eigen::MatrixXd getCOMpos();
   Eigen::MatrixXd getCOMvel();
+
   Eigen::MatrixXd getJCOMMatrix();
   Eigen::MatrixXd getJCOMDot();
-
+  Eigen::MatrixXd getTdotMatrix();
   double getMass();
   int getDoFsnumber();
 
@@ -83,16 +82,17 @@ class QUADRUPED
   // Gravity acceleration
   iDynTree::Vector3       gravity; 
 
- // Position vector base+joints
+
+// Position vector base+joints
   iDynTree::VectorDynSize  qb;
 
   // Velocity vector base+joints
   iDynTree::VectorDynSize  dqb;
 
-  // Position vector
+  // Position vector COM+joints
   iDynTree::VectorDynSize  q;
 
-  // Velocity vector
+  // Velocity vector COM+joints
   iDynTree::VectorDynSize  dq;
 
   // Joints limit vector
@@ -119,20 +119,18 @@ class QUADRUPED
   
   // Jacobian
   iDynTree::MatrixDynSize Jac;
-  
- // Jacobian base
+
+  // Jacobian base
   iDynTree::MatrixDynSize Jb;
-  
 
-  // Jacobian derivative
+   // Jacobian derivative
   iDynTree::MatrixDynSize JacDot;
-
+  
   //CoM Jacobian
   iDynTree::MatrixDynSize Jcom;
- 
+
   //CoM Jacobian
   iDynTree::MatrixDynSize Jcomdot;
-
   
   // Bias acceleration J_dot*q_dot
   iDynTree::MatrixDynSize Jdqd;
@@ -140,12 +138,12 @@ class QUADRUPED
   // Transformation Matrix
   iDynTree::MatrixDynSize T;
   
-  // Transformation matrix inverse time derivative
+  // Transformation matrix time derivative
   iDynTree::MatrixDynSize T_inv_dot;
-  
+
   // Transformation matrix time derivative
   iDynTree::MatrixDynSize T_dot;
-
+  
   //Model
   iDynTree::Model model;
   iDynTree::ModelLoader mdlLoader;
@@ -178,14 +176,16 @@ class QUADRUPED
   // Compute the Jacobian
   void  computeJac();
 
+  void  ComputeJaclinear();
   // Compute matrix transformation T needed to recompute matrices/vecotor after the coordinate transform to the CoM
   void computeTransformation(Eigen::VectorXd Vel_);
   
   // Compute bias acceleration J_dot*q_dot
   void computeJacDotQDot();
   
+  void computeJdqdCOMlinear();
   // Compute Jacobian time derivative
- void computeJacDot(Eigen::Matrix<double, 18,1> Vel_);
+  void computeJacDot(Eigen::Matrix<double, 18,1> Vel_);
   
   //Compute partial derivative
   Eigen::VectorXd  getPartialDerivativeJac(const Eigen::MatrixXd Jacobian, const unsigned int& joint_idx,  const unsigned int& column_idx);
