@@ -26,11 +26,12 @@ class QUADRUPEDController
      QUADRUPEDController(QUADRUPED &quadruped_);
      
      
-     Eigen::VectorXd Cntr(iDynTree::Vector6 &CoMPosDes,
-                 iDynTree::Vector6 &CoMVelDes,
-                 iDynTree::Vector6 &CoMAccDes,
+     Eigen::VectorXd Cntr(Eigen::Matrix<double,6,1> &CoMPosDes,
+                 Eigen::Matrix<double,6,1> &CoMVelDes,
+                 Eigen::Matrix<double,6,1> &CoMAccDes,
                  Eigen::MatrixXd &Kcom,
-                 Eigen::MatrixXd &Dcom);
+                 Eigen::MatrixXd &Dcom,
+                 float &m, float &q_plus, float &q_minus, float &qs, float &qr);
 
 
 

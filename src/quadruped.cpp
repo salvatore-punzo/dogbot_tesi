@@ -662,8 +662,10 @@ Eigen::MatrixXd QUADRUPED::getMassMatrixCOM_joints()
 
 
 // Quadratic problem
-Eigen::VectorXd QUADRUPED::qpproblem( Eigen::Matrix<double,6,1> &Wcom_des)
+Eigen::VectorXd QUADRUPED::qpproblem( Eigen::Matrix<double,6,1> &Wcom_des, float &m, float &q_plus, float &q_minus, float &qs, float &qr)
 {
+	Eigen::Matrix<double,6,1> com_pos = iDynTree::toEigen(CoM);
+	Eigen::Matrix<double,6,1> com_vel = iDynTree::toEigen(CoM_vel);
 	/* //termini noti del problema quadratico
 	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_plus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
 	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_minus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);

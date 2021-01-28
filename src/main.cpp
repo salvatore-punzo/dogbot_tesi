@@ -40,6 +40,7 @@
 #include "traj_planner.h"
 #include "capture_point.h"
 #include "prob_quadratico_cp.h"
+#include "quadruped_control.h"
 
 
 using namespace Eigen;
@@ -229,6 +230,9 @@ int main(int argc, char **argv){
 	CAPTURE_POINT *cp;
 	cp = new CAPTURE_POINT;
 	
+	// Set controller Viviana
+    QUADRUPEDController *doggoControl; //controller_(doggo);
+	doggoControl = new QUADRUPEDController(*doggo);
 	
 	
 	//Start node
@@ -273,6 +277,7 @@ int main(int argc, char **argv){
 
 	//Segnale di controllo
 	   std_msgs::Float64MultiArray msg_ctrl;
+	   std_msgs::Float64MultiArray tau1_msg;
 
 	    // Start the robot in position (stand up) 
       gazebo_msgs::SetModelConfiguration robot_init_config;
@@ -362,12 +367,15 @@ int main(int argc, char **argv){
 
 	end_vel = Matrix<double,6,1>::Zero();
 	end_vel = init_acc = end_acc;
-	std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
+	//std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
 	traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
 
 	trajectory_point traj;
      traj = traiettoria->getTraj();
-	
+	 
+	 // Set Gain Matrix per controllo Viviana
+     Eigen::MatrixXd Kcom=2500*Eigen::MatrixXd::Identity(6,6);
+     Eigen::MatrixXd Dcom=50*Eigen::MatrixXd::Identity(6,6);
 
 		// initial simulation time 
      ros::Time begin = ros::Time::now();
@@ -377,8 +385,9 @@ int main(int argc, char **argv){
     { 
 		//prendo punto della traiettorie nell'ista desi 
 	
-	cout<<"joint_state_available: "<<joint_state_available<<endl;
-			if(joint_state_available==true && joint_base_available==true){
+		cout<<"joint_state_available: "<<joint_state_available<<endl;
+			if(joint_state_available==true && joint_base_available==true)
+			{
 				/*
 				cout<<"world_H_base"<<endl<<world_H_base<<endl;
 				cout<<"basevel"<<endl<<basevel<<endl;
@@ -401,7 +410,7 @@ int main(int argc, char **argv){
 				// Time
          		t = (ros::Time::now()-begin).toSec();
          		int idx= std::round( t*1000);
-
+				cout<<"p"<<endl;
 				//Calcolo vettori desiderati prendo solo la posizione e non l'orientamento
 				Matrix<double,6,1> composdes, comveldes, comaccdes;
 				composdes<<traj.pos(0,idx), traj.pos(1,idx), traj.pos(2,idx),MatrixXd::Zero(3,1);
@@ -441,14 +450,23 @@ int main(int argc, char **argv){
 				for (int i=0; i<18; i++){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
 				}
-
+				//controllo senza capture point
 				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
 				//vector<double> tau = ottim->getTau();
 
-				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot, m, q_positive, q_negative, q_s, q_r);
-				vector<double> tau = ottim_cp->getTau();				
+				//Controllo con capture point
+				//ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot, m, q_positive, q_negative, q_s, q_r);
+				//vector<double> tau = ottim_cp->getTau();				
 				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
-				
+				cout<<"p1"<<endl;
+				// Compute control torque
+				// control vector
+      			Eigen::VectorXd tau;
+      			tau.resize(12);
+       			tau = doggoControl->Cntr(composdes, comveldes, comaccdes,
+                                 Kcom, Dcom, m, q_positive, q_negative, q_s, q_r);
+				cout<<"p2"<<endl;
+      			 std::cout<<"tau"<<tau<<std::endl;
 				//--------------------pubblico le coppie calcolate --------------------
 				
 				//vector<double> tau = cp->getTau();
@@ -460,6 +478,7 @@ int main(int argc, char **argv){
 				msg_ctrl.layout.dim[0].label = "x"; // or whatever name you typically use to index vec1*/
 
 				// copy in the data
+				/*
 				msg_ctrl.data.clear();
 				//msg_ctrl.data.insert(msg_ctrl.data.end(), tau.begin(), tau.end());
 				//stampa tau e controlla anche il topic command
@@ -469,16 +488,45 @@ int main(int argc, char **argv){
 				}
 				
 				_tau_pub.publish(msg_ctrl);
-				
+				*/
+				//-------------------------------coppie per controllo Viviana
+				// Set command message
+				tau1_msg.data.clear();
+				std::vector<double> ta(12,0.0);
+
+				// torques in right order
+				ta[11]=tau(7);
+				ta[10]=tau(6);
+				ta[9]=tau(2);
+				ta[8]=tau(5);
+				ta[7]=tau(4);
+				ta[6]=tau(3);
+				ta[5]=tau(9);
+				ta[4]=tau(8);
+				ta[3]=tau(1);
+				ta[2]=tau(11);
+				ta[1]=tau(10);
+				ta[0]=tau(0);
+
+
+				// Fill Command message
+				for(int i=0; i<12; i++)
+				{
 			
+					tau1_msg.data.push_back(ta[i]);
+				}
+
+				//Sending command
+					_tau_pub.publish(tau1_msg);
+
 
 			}
-			// One step in gazebo world ( to use if minqp problem takes too long for control loop)
-        	pub->Publish(stepper);
-			cout<<"stepper"<<endl;
-			ros::spinOnce();
-			cout<<"stepper2"<<endl;
-			loop_rate.sleep();
+				// One step in gazebo world ( to use if minqp problem takes too long for control loop)
+				pub->Publish(stepper);
+				cout<<"stepper"<<endl;
+				ros::spinOnce();
+				cout<<"stepper2"<<endl;
+				loop_rate.sleep();
 		
 		
 		
