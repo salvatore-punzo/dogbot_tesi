@@ -458,27 +458,12 @@ int main(int argc, char **argv){
 				//ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot, m, q_positive, q_negative, q_s, q_r);
 				//vector<double> tau = ottim_cp->getTau();				
 				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
-				cout<<"p1"<<endl;
-				// Compute control torque
-				// control vector
-      			Eigen::VectorXd tau;
-      			tau.resize(12);
-       			tau = doggoControl->Cntr(composdes, comveldes, comaccdes,
-                                 Kcom, Dcom, m, q_positive, q_negative, q_s, q_r);
-				cout<<"p2"<<endl;
-      			 std::cout<<"tau"<<tau<<std::endl;
-				//--------------------pubblico le coppie calcolate --------------------
 				
-				//vector<double> tau = cp->getTau();
-
-				// set up dimensions
-				//msg_ctrl.layout.dim.push_back(std_msgs::MultiArrayDimension());
-				/*msg_ctrl.layout.dim[0].size = tau.size();
-				msg_ctrl.layout.dim[0].stride = 1;
-				msg_ctrl.layout.dim[0].label = "x"; // or whatever name you typically use to index vec1*/
-
+				
+				//--------------------pubblico le coppie calcolate --------------------
+/*
 				// copy in the data
-				/*
+				
 				msg_ctrl.data.clear();
 				//msg_ctrl.data.insert(msg_ctrl.data.end(), tau.begin(), tau.end());
 				//stampa tau e controlla anche il topic command
@@ -490,6 +475,15 @@ int main(int argc, char **argv){
 				_tau_pub.publish(msg_ctrl);
 				*/
 				//-------------------------------coppie per controllo Viviana
+				
+				// Compute control torque
+				// control vector
+      			Eigen::VectorXd tau;
+      			tau.resize(12);
+       			tau = doggoControl->Cntr(composdes, comveldes, comaccdes,
+                                 Kcom, Dcom, m, q_positive, q_negative, q_s, q_r);
+				
+      			 std::cout<<"tau"<<tau<<std::endl;
 				// Set command message
 				tau1_msg.data.clear();
 				std::vector<double> ta(12,0.0);
@@ -519,7 +513,7 @@ int main(int argc, char **argv){
 				//Sending command
 					_tau_pub.publish(tau1_msg);
 
-
+//-----------------------------------------------------
 			}
 				// One step in gazebo world ( to use if minqp problem takes too long for control loop)
 				pub->Publish(stepper);

@@ -29,7 +29,8 @@ class QUADRUPED
 	void update(Eigen::Matrix4d &eigenWorld_H_base, Eigen::VectorXd &eigenJointPos, Eigen::VectorXd &eigenJointVel, Eigen::Matrix<double,6,1> &eigenBasevel, Eigen::Vector3d &eigenGravity);			
   
   // Solve quadratic problem for contact forces
-  Eigen::VectorXd qpproblem( Eigen::Matrix<double,6,1> &Wcom_des, float &m, float &q_plus, float &q_minus, float &qs, float &qr);
+  Eigen::VectorXd qpproblem( Eigen::Matrix<double,6,1> &Wcom_des);
+  Eigen::VectorXd qpproblem_cp( Eigen::Matrix<double,6,1> &Wcom_des, float &m, float &q_plus, float &q_minus, float &qs, float &qr);
 
   // get function
 	Eigen::VectorXd getBiasMatrix();
@@ -57,6 +58,12 @@ class QUADRUPED
   int getDoFsnumber();
 
   private:
+
+  double tnp,tnn, tnr, tns;
+  double com_zdes = 0.4;
+  float w;//eigenfrequency
+	double dt=0.001;
+	double Dt=10*dt;
   
   // int for DoFs number
   unsigned int n;
