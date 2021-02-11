@@ -7,7 +7,8 @@ PROB_QUAD_CP::PROB_QUAD_CP(){
 };
 
 void PROB_QUAD_CP::CalcoloProbOttimoCP(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, 
-Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot,  float &m, float &q_plus, float &q_minus, float &qs, float &qr){
+Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot,
+float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl){
 	//eigenfrequency
 	w=sqrt(9.81/com_zdes);
 	
@@ -17,10 +18,10 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	cout<<"qr: "<<qr<<endl;
 	*/
 	
-	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_plus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
-	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_minus +m * com_pos(0) +m * com_vel(0) * Dt  +m *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
-   	tnr = 2*w/(pow(Dt,2)*w + 2 * Dt) * (qr + (-1/m) * com_pos(0) +(-1/m) * com_vel(0) * Dt  +(-1/m) *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
-	tns = 2*w/(pow(Dt,2)*w + 2 * Dt) * (qs + (-1/m) * com_pos(0) +(-1/m) * com_vel(0) * Dt  +(-1/m) *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_frbr +m_frbr * com_pos(0) +m_frbr * com_vel(0) * Dt  +m_frbr *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_blfl +m_blfl * com_pos(0) +m_blfl * com_vel(0) * Dt  +m_blfl *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+   	tnr = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_flfr +m_flfr * com_pos(0) +m_flfr * com_vel(0) * Dt  +m_flfr *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	tns = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_brbl +m_brbl * com_pos(0) +m_brbl * com_vel(0) * Dt  +m_brbl *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
 
 
 		
@@ -157,9 +158,11 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	Matrix<double,102,43> A;
      
 	//controlla i segni di kp e kd, controlla i segni della matrice A, verifica Jt1
-	Matrix<double,1,6>cps1,cps2;
-	cps1<<-m,1,0,0,0,0;
-	cps2<<1/m,1,0,0,0,0;
+	Matrix<double,1,6>cps1,cps2,cps3,cps4;
+	cps1<<-m_frbr,1,0,0,0,0;
+	cps2<<-m_blfl,1,0,0,0,0;
+	cps3<<-m_flfr,1,0,0,0,0;
+	cps4<<-m_brbl,1,0,0,0,0;
 
 	A<< M,-Jc_T_B,-S_T, -b,
 		B_T_Jc, Matrix<double,12,24>::Zero(),-B.transpose()*Jcdqd,
@@ -169,9 +172,9 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 		Matrix<double,12,30>::Zero(), Eigen::Matrix<double,12,12>::Identity(),tau_max,
 		Matrix<double,12,30>::Zero(), -Eigen::Matrix<double,12,12>::Identity(),-tau_min,
 		cps1*Jt1, Matrix<double,1,24>::Zero(),cps1*Jt1_dot_dq + tnp,
-		cps1*Jt1, Matrix<double,1,24>::Zero(),cps1*Jt1_dot_dq + tnn,
-		cps2*Jt1, Matrix<double,1,24>::Zero(),cps2*Jt1_dot_dq + tnr,
-		cps2*Jt1, Matrix<double,1,24>::Zero(),cps2*Jt1_dot_dq + tns;
+		cps2*Jt1, Matrix<double,1,24>::Zero(),cps1*Jt1_dot_dq + tnn,
+		cps3*Jt1, Matrix<double,1,24>::Zero(),cps2*Jt1_dot_dq + tnr,
+		cps4*Jt1, Matrix<double,1,24>::Zero(),cps2*Jt1_dot_dq + tns;
     
 
 	//cout<<"A:"<<endl;

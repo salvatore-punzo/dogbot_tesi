@@ -20,7 +20,7 @@ Eigen::VectorXd QUADRUPEDController::Cntr(Eigen::Matrix<double,6,1> &CoMPosDes,
                             Eigen::Matrix<double,6,1> &CoMAccDes,
                             Eigen::MatrixXd &Kcom,
                             Eigen::MatrixXd &Dcom,
-                            float &m, float &q_plus, float &q_minus, float &qs, float &qr
+                            float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl
                             )
 {
 
@@ -50,7 +50,7 @@ Eigen::VectorXd QUADRUPEDController::Cntr(Eigen::Matrix<double,6,1> &CoMPosDes,
 // Solve quadratic problem
 
   //tau=dogbot->qpproblem(Wcom_des);
-  tau=dogbot->qpproblem_cp(Wcom_des,m, q_plus, q_minus, qs, qr);
+  tau=dogbot->qpproblem_cp(Wcom_des,m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl);
   
   return tau;
 

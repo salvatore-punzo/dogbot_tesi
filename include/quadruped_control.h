@@ -31,7 +31,8 @@ class QUADRUPEDController
                  Eigen::Matrix<double,6,1> &CoMAccDes,
                  Eigen::MatrixXd &Kcom,
                  Eigen::MatrixXd &Dcom,
-                 float &m, float &q_plus, float &q_minus, float &qs, float &qr);
+                 float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl
+                 );
 
 
 

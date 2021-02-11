@@ -342,11 +342,13 @@ int main(int argc, char **argv){
 	pauseGazebo.call(pauseSrv);
 
 	//Update robot 
+	/*
 	cout<<"world_H_base"<<endl<<world_H_base<<endl;
 				cout<<"basevel"<<endl<<basevel<<endl;
 				cout<<"q_joints"<<endl<<q_joints<<endl;
 				cout<<"dq_joints"<<endl<<dq_joints<<endl;
 				cout<<"gravity1"<<endl<<gravity1<<endl;
+				*/
 
 	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
@@ -417,11 +419,12 @@ int main(int argc, char **argv){
 				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx),MatrixXd::Zero(3,1);
 				
 				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx),MatrixXd::Zero(3,1);
-
+/*
 				cout<<"com posizione desiderata:"<<endl<<composdes<<endl;
 				cout<<"com velocità desiderata:"<<endl<<comveldes<<endl;
 				cout<<"com posizione ottenuta:"<<endl<<com_pos<<endl;
 				cout<<"com velocità ottenuta:"<<endl<<com_vel<<endl;
+*/
 				//Calcolo lunghezza gamba fisica
 				leglength->calculate_leg_length_cb(hp, kp);
 				VectorXd ll = leglength->getLegLength();
@@ -432,7 +435,32 @@ int main(int argc, char **argv){
 				cout<<"coordinate ee bl: "<<endl<<coo_ee_bl<<endl;
 				*/
 				poligono_sup->calcoloPoligonoSupporto(ll, hp, he, kp, rp, eef_bl, eef_br, eef_fl, eef_fr, coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr, rot_world_virtual_base);
-			
+				float m_blfl = poligono_sup->getm_blfl();
+				float m_flfr = poligono_sup->getm_flfr();
+				float m_frbr = poligono_sup->getm_frbr();
+				float m_brbl = poligono_sup->getm_brbl();
+
+				float q_blfl = poligono_sup->getq_blfl();
+				float q_flfr = poligono_sup->getq_flfr();
+				float q_frbr = poligono_sup->getq_frbr();
+				float q_brbl = poligono_sup->getq_brbl();
+
+/*  //coefficienti angolari delle rette del poligono di supporto
+
+				cout<<"m_blfl: "<<m_blfl<<endl;
+				cout<<"m_flfr: "<<m_flfr<<endl;
+				cout<<"m_frbr: "<<m_frbr<<endl;
+				cout<<"m_brbl: "<<m_brbl<<endl;
+
+	//intercette verticali delle rette del poligono di supporto
+
+				cout<<"q_blfl: "<<q_blfl<<endl;
+				cout<<"q_flfr: "<<q_flfr<<endl;
+				cout<<"q_frbr: "<<q_frbr<<endl;
+				cout<<"q_brbl: "<<q_brbl<<endl;
+*/
+
+				/* //parametri delle rette del poligono di supporto caso bipede
 				//coefficinete angolare
 				float m = poligono_sup->getm();
 				//intercetta verticale
@@ -440,11 +468,13 @@ int main(int argc, char **argv){
 				float q_negative = poligono_sup->getq_newn();
 				float q_s = poligono_sup->getqs();
 				float q_r = poligono_sup->getqr();
+				*/
 				/*
 				cout<<"mm: "<<m<<endl;
 				cout<<"qsm: "<<q_s<<endl;
 				cout<<"qrm: "<<q_r<<endl;
 				*/
+
 			
 				//stampo giunti che passo al controllo ottimo
 				for (int i=0; i<18; i++){
@@ -455,13 +485,14 @@ int main(int argc, char **argv){
 				//vector<double> tau = ottim->getTau();
 
 				//Controllo con capture point
-				//ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot, m, q_positive, q_negative, q_s, q_r);
-				//vector<double> tau = ottim_cp->getTau();				
-				//cp->capture_point(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, com_pos, com_vel, m, q_positive, q_negative, q_s, q_r);
+				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot,
+				 m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl);
+				vector<double> tau = ottim_cp->getTau();				
 				
-				
+
+
 				//--------------------pubblico le coppie calcolate --------------------
-/*
+
 				// copy in the data
 				
 				msg_ctrl.data.clear();
@@ -473,15 +504,15 @@ int main(int argc, char **argv){
 				}
 				
 				_tau_pub.publish(msg_ctrl);
-				*/
+
 				//-------------------------------coppie per controllo Viviana
-				
+		/*		
 				// Compute control torque
 				// control vector
       			Eigen::VectorXd tau;
       			tau.resize(12);
-       			tau = doggoControl->Cntr(composdes, comveldes, comaccdes,
-                                 Kcom, Dcom, m, q_positive, q_negative, q_s, q_r);
+       			tau = doggoControl->Cntr(composdes, comveldes, comaccdes, Kcom, Dcom, 
+				   m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl);
 				
       			 std::cout<<"tau"<<tau<<std::endl;
 				// Set command message
@@ -512,7 +543,7 @@ int main(int argc, char **argv){
 
 				//Sending command
 					_tau_pub.publish(tau1_msg);
-
+*/
 //-----------------------------------------------------
 			}
 				// One step in gazebo world ( to use if minqp problem takes too long for control loop)

@@ -38,6 +38,15 @@ class POLI_SUP{
         float getq_newn();
         float getqr();
         float getqs();
+
+        float getm_blfl();
+        float getq_blfl();
+        float getm_flfr();
+        float getq_flfr();
+        float getm_frbr();
+        float getq_frbr();
+        float getm_brbl();
+        float getq_brbl();
     private:
         Matrix3d rot_roll_br, rot_pitch_br, rot_knee_br, rot_roll_bl, rot_pitch_bl, rot_knee_bl;
         Vector3d sele_z;
@@ -64,8 +73,8 @@ class POLI_SUP{
         float eef_vb_rlz;
         float eef_vb_llz;
 
-        float m;
-		float q;
+        float m,m_blfl,m_flfr,m_frbr,m_brbl;
+		float q,q_blfl,q_flfr,q_frbr,q_brbl;
 		float q_newp;
 		float q_newn;
 		float m_pep;
