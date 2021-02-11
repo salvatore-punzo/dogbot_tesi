@@ -483,10 +483,14 @@ int main(int argc, char **argv){
 				//controllo senza capture point
 				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
 				//vector<double> tau = ottim->getTau();
-
+				float x_inf, x_sup, y_inf, y_sup;
+				x_inf = coo_ee_bl(0);
+				x_sup = coo_ee_br(0);
+    			y_inf = coo_ee_bl(1);
+    			y_sup = coo_ee_fl(1);
 				//Controllo con capture point
 				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot,
-				 m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl);
+				 m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl, x_inf, x_sup, y_inf, y_sup);
 				vector<double> tau = ottim_cp->getTau();				
 				
 

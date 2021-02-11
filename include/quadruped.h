@@ -31,8 +31,8 @@ class QUADRUPED
   // Solve quadratic problem for contact forces
   Eigen::VectorXd qpproblem( Eigen::Matrix<double,6,1> &Wcom_des);
   Eigen::VectorXd qpproblem_cp( Eigen::Matrix<double,6,1> &Wcom_des, float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl);
-  //enum SWING_LEG { BR, FL, BL, FR}; // 4 legs, br-fl, bl-fr
-  //Eigen::VectorXd qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::Vector3d vdotswdes,  SWING_LEG swingleg);
+  enum SWING_LEG { BR, FL, BL, FR}; // 4 legs, br-fl, bl-fr
+  Eigen::VectorXd qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::Vector3d vdotswdes,  SWING_LEG swingleg);
  
   // get function
 	Eigen::VectorXd getBiasMatrix();
@@ -66,6 +66,7 @@ class QUADRUPED
   float w;//eigenfrequency
 	double dt=0.001;
 	double Dt=10*dt;
+  Eigen::Matrix<double,30,1> x_eigen;
   
   // int for DoFs number
   unsigned int n;

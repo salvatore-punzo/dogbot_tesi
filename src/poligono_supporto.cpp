@@ -50,7 +50,7 @@ void POLI_SUP::calcoloPoligonoSupporto(VectorXd &ll, VectorXd &hp, VectorXd &he,
 
 //rot_world_virtual_base invece mi serve per portare il vettore dal sistema di riferimento della floating base a quello del sistema mondo
 	
-     //Parametri delle rette del poligono di supporto
+     //Parametri delle rette del poligono di supporto nel caso ini cui il poligono di supporto ha i lati non paralleli agli assi
     
     m_blfl = (coo_ee_fl(1)-coo_ee_bl(1))/(coo_ee_fl(0) - coo_ee_bl(0)); // (y2-y1)/(x2-x1)
     q_blfl = (- m_blfl * coo_ee_bl(0) + coo_ee_bl(1)); //-x1*m +y1
@@ -63,6 +63,13 @@ void POLI_SUP::calcoloPoligonoSupporto(VectorXd &ll, VectorXd &hp, VectorXd &he,
 
     m_brbl = (coo_ee_bl(1)-coo_ee_br(1))/(coo_ee_bl(0) - coo_ee_br(0)); 
     q_brbl = (-m_brbl * coo_ee_br(0) + coo_ee_br(1)); 
+  //  ----------------------------------------------------
+
+  //parametri inferiori e superiori per il poligono di supporto che alla fine ho passato direttamente dal main
+  	x_inf = coo_ee_bl(0);
+	x_sup = coo_ee_br(0);
+    y_inf = coo_ee_bl(1);
+    y_sup = coo_ee_fl(1);
  /*
     cout<<"coordinata x del piede back destro del virtual biped: "<<coo_ee_br(0)<<endl;
 	cout<<"coordinata y del piede back destro del virtual biped: "<<coo_ee_br(1)<<endl;

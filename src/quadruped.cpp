@@ -1176,7 +1176,7 @@ float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float
 	return tau;
 
 }
-/*
+
 // Quadratic problem back right leg
 Eigen::VectorXd QUADRUPED::qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::Vector3d vdotswdes,  SWING_LEG swingleg)
 {
@@ -1448,7 +1448,7 @@ Eigen::VectorXd QUADRUPED::qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eig
     }
     
 
- */    
+     
     //Bounded constraints
      /*Eigen::Matrix<double,30, 1> eigenBL= Eigen::Matrix<double,30,1>::Zero();
      
@@ -1482,7 +1482,7 @@ Eigen::VectorXd QUADRUPED::qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eig
     bl(26)=0;
 	bl(29)=0;*/
 
-/*   
+   
     // Set qp
    // alglib::minqpsetbc(state, bl, bu);
     alglib::minqpsetlc(state, L, Lt);
@@ -1496,6 +1496,7 @@ Eigen::VectorXd QUADRUPED::qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eig
     alglib::minqpoptimize(state);
 
 	// Solve qp
+	
     alglib::minqpresults(state, x_, rep);
 
     
@@ -1514,4 +1515,3 @@ Eigen::VectorXd QUADRUPED::qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 
 }
 
-*/

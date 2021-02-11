@@ -8,7 +8,9 @@ PROB_QUAD_CP::PROB_QUAD_CP(){
 
 void PROB_QUAD_CP::CalcoloProbOttimoCP(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, 
 Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot,
-float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl){
+float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl,
+float &x_inf, float &x_sup, float&y_inf, float &y_sup)
+{
 	//eigenfrequency
 	w=sqrt(9.81/com_zdes);
 	
@@ -17,12 +19,20 @@ float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float
 	cout<<"qs: "<<qs<<endl;
 	cout<<"qr: "<<qr<<endl;
 	*/
+
+	//vincoli superiori e inferiori per il poligono di supporto 
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (x_sup  - com_pos(0) - com_vel(0) * Dt  -com_pos(0)/w);
+	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (x_inf  - com_pos(0) - com_vel(0) * Dt  -com_pos(0)/w);
+
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (y_inf  - com_pos(1) - com_vel(1) * Dt  -com_pos(1)/w);
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (y_sup  - com_pos(1) - com_vel(1) * Dt  -com_pos(1)/w);
 	
+	/* // vincoli per il caso in cui i lati del poligono di supporto non sono paralleli agli assi di riferimento di gazebo
 	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_frbr +m_frbr * com_pos(0) +m_frbr * com_vel(0) * Dt  +m_frbr *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
 	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_blfl +m_blfl * com_pos(0) +m_blfl * com_vel(0) * Dt  +m_blfl *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
    	tnr = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_flfr +m_flfr * com_pos(0) +m_flfr * com_vel(0) * Dt  +m_flfr *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
 	tns = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_brbl +m_brbl * com_pos(0) +m_brbl * com_vel(0) * Dt  +m_brbl *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
-
+	*/
 
 		
 	// Matrici Jacobiane
@@ -171,11 +181,16 @@ float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float
 		Matrix<double,12,6>::Zero(), -Eigen::Matrix<double,12,12>::Identity(), Matrix<double,12,24>::Zero(), -ddqmin,
 		Matrix<double,12,30>::Zero(), Eigen::Matrix<double,12,12>::Identity(),tau_max,
 		Matrix<double,12,30>::Zero(), -Eigen::Matrix<double,12,12>::Identity(),-tau_min,
+		1,Matrix<double,1,41>::Zero(),tnp,
+		1,Matrix<double,1,41>::Zero(), tnn,
+		0,1, Matrix<double,1,40>::Zero(),tnr,
+		0,1, Matrix<double,1,40>::Zero(),tns;
+		/* vincoli per lati poligono di supporto non paralleli
 		cps1*Jt1, Matrix<double,1,24>::Zero(),cps1*Jt1_dot_dq + tnp,
 		cps2*Jt1, Matrix<double,1,24>::Zero(),cps1*Jt1_dot_dq + tnn,
 		cps3*Jt1, Matrix<double,1,24>::Zero(),cps2*Jt1_dot_dq + tnr,
 		cps4*Jt1, Matrix<double,1,24>::Zero(),cps2*Jt1_dot_dq + tns;
-    
+		*/
 
 	//cout<<"A:"<<endl;
 	//cout<<A<<endl;

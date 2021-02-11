@@ -26,7 +26,8 @@ class PROB_QUAD_CP{
     public:
         PROB_QUAD_CP();
         void CalcoloProbOttimoCP(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot,
-		float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl);
+		float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl,
+		float &x_inf, float &x_sup, float&y_inf, float &y_sup);
         //get function
         vector<double> getTau();
 
@@ -54,6 +55,7 @@ class PROB_QUAD_CP{
 	float w;//eigenfrequency
 	double dt=0.001;
 	double Dt=10*dt;
+	
 
     vector<double> tau;
 /*

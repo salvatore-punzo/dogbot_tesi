@@ -81,6 +81,7 @@ class POLI_SUP{
 		float qr;
 		float qs;
 		float xa,ya,xb,yb,xc,yc,xd,yd;
+        float x_inf, x_sup, y_inf, y_sup; //limiti inferiori e superiori per il poligono di supporto
 
 
 };
