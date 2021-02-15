@@ -52,7 +52,7 @@ class PROB_QUAD_CP{
 	Matrix<double,6,6> kd = 50*MatrixXd::Identity(6,6); //2*sqrt(kp);
     double com_zdes = 0.4;
 	double tnp,tnn, tnr, tns;
-	float w;//eigenfrequency
+	float w,cpx,cpy;//eigenfrequency
 	double dt=0.001;
 	double Dt=10*dt;
 	

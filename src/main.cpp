@@ -260,7 +260,9 @@ int main(int argc, char **argv){
 	
 	//Publisher
 	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",1);
-	ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",1);
+	//ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",1);
+	ros::Publisher _foothold_pub = _nh.advertise<std_msgs::Float64MultiArray>("/foothold",1);
+	
 	//Service 
 	ros::ServiceClient set_model_configuration_srv = _nh.serviceClient<gazebo_msgs::SetModelConfiguration>("/gazebo/set_model_configuration");
     ros::ServiceClient set_model_state_srv = _nh.serviceClient<gazebo_msgs::SetModelState>("/gazebo/set_model_state");
@@ -276,8 +278,10 @@ int main(int argc, char **argv){
 	   
 
 	//Segnale di controllo
-	   std_msgs::Float64MultiArray msg_ctrl;
-	   std_msgs::Float64MultiArray tau1_msg;
+		std_msgs::Float64MultiArray msg_ctrl;
+		std_msgs::Float64MultiArray tau1_msg;
+	//Topic per grafico
+		std_msgs::Float64MultiArray foothold;
 
 	    // Start the robot in position (stand up) 
       gazebo_msgs::SetModelConfiguration robot_init_config;
@@ -492,7 +496,22 @@ int main(int argc, char **argv){
 				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot,
 				 m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl, x_inf, x_sup, y_inf, y_sup);
 				vector<double> tau = ottim_cp->getTau();				
-				
+				//publico i foothold
+				foothold.data.clear();
+				foothold.data.push_back(coo_ee_bl(0));
+				foothold.data.push_back(coo_ee_bl(1));
+				foothold.data.push_back(coo_ee_bl(2));
+				foothold.data.push_back(coo_ee_br(0));
+				foothold.data.push_back(coo_ee_br(1));
+				foothold.data.push_back(coo_ee_br(2));
+				foothold.data.push_back(coo_ee_fl(0));
+				foothold.data.push_back(coo_ee_fl(1));
+				foothold.data.push_back(coo_ee_fl(2));
+				foothold.data.push_back(coo_ee_fr(0));
+				foothold.data.push_back(coo_ee_fr(1));
+				foothold.data.push_back(coo_ee_fr(2));
+
+				_foothold_pub.publish(foothold);
 
 
 				//--------------------pubblico le coppie calcolate --------------------

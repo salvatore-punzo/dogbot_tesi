@@ -275,7 +275,7 @@ for(int i = 6;i<18;i++){
 	cout<<"q joints corrente "<<i<<": "<<q_joints_total(i)<<endl;
 	cout<<"qmax - qcorrente: "<<qmax(i-6)-q_joints_total(i)<<endl;
 	cout<<"qmin - qcorrente: "<<qmin(i-6)-q_joints_total(i)<<endl;
-}
+	}
 	*/
 	real_1d_array x;
 	minqpstate state;
@@ -302,6 +302,11 @@ for(int i = 6;i<18;i++){
 
     tau = { x(30),x(40),x(41),x(31),x(38),x(39),x(33),x(34),x(35),x(32),x(36),x(37)};
     
+	cpx = com_pos(0)+com_vel(0)/w;
+	cpy = com_pos(1)+com_vel(1)/w;
+	cout<<"cpx: "<<cpx<<endl;
+	cout<<"cpy: "<<cpy<<endl;
+
 }
 
 
