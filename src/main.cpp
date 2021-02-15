@@ -68,6 +68,7 @@ double com_zdes = 0.4;
 //Vector3d com_pos,com_vel;
 
 
+
 void Joint_cb(sensor_msgs::JointStateConstPtr js){
 	joint_state_available = true;
 	
@@ -375,7 +376,9 @@ int main(int argc, char **argv){
 	end_vel = init_acc = end_acc;
 	//std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
 	traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
-
+	//tf=0.2
+	//calcola due spline separate: una che la fa salire e l'altra scendere (zc=0.05 altezza massima desiderata)
+	//init_pos=0,0,0; end_pos=offset/2,0,offset; nella seconda init pos= endpos prece end_ponew = offset,0,0
 	trajectory_point traj;
      traj = traiettoria->getTraj();
 	 
@@ -487,7 +490,7 @@ int main(int argc, char **argv){
 				//controllo senza capture point
 				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
 				//vector<double> tau = ottim->getTau();
-				float x_inf, x_sup, y_inf, y_sup;
+				float x_inf, x_sup, y_inf, y_sup, cpx, cpy, w;
 				x_inf = coo_ee_bl(0);
 				x_sup = coo_ee_br(0);
     			y_inf = coo_ee_bl(1);
@@ -495,8 +498,20 @@ int main(int argc, char **argv){
 				//Controllo con capture point
 				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot,
 				 m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl, x_inf, x_sup, y_inf, y_sup);
-				vector<double> tau = ottim_cp->getTau();				
-				//publico i foothold
+				vector<double> tau = ottim_cp->getTau();
+
+				//controllo sul capture point e traiettoria
+				w=sqrt(9.81/com_zdes);
+				cpx = com_pos(0)+com_vel(0)/w;
+				cpy = com_pos(1)+com_vel(1)/w;
+				//supponendo la spinta con la stessa direzione dell'asse x
+				if(cpx > x_sup)
+				{
+					//traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
+				}
+
+
+				//pubblico i foothold
 				foothold.data.clear();
 				foothold.data.push_back(coo_ee_bl(0));
 				foothold.data.push_back(coo_ee_bl(1));

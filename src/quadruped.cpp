@@ -1515,3 +1515,362 @@ Eigen::VectorXd QUADRUPED::qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 
 }
 
+// Quadratic problem back right leg
+Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes,  SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> &fext)
+{
+	int swl1, swl2, stl1, stl2;
+    switch(swinglegs){
+		case L1: swl1=0;
+		swl2=0; 
+		stl1=0;//0 indica br; 3 bl; 6->fl; 9->fr
+		stl2=0; 
+		break;
+		case L2: swl1=0;
+		swl2=9 ;
+		stl1=3;
+		stl2=6; 
+		 break;
+		case L3: swl1=3;
+		swl2=6;
+		stl1=0;
+		stl2=9; 
+		 break;
+	}
+
+	// Set variables
+   int variables=30;
+   alglib::real_2d_array Q, R, L;
+   alglib::real_1d_array c, bl, bu;
+   alglib::integer_1d_array Lt;
+   
+   Q.setlength(variables,variables);
+   c.setlength(variables);
+   bl.setlength(variables);
+   bu.setlength(variables);
+   L.setlength(82,31);
+   Lt.setlength(82);
+
+
+   // Taking Jacobian for CoM and joints
+   Eigen::Matrix<double, 6, 6> Jstcom= Eigen::Matrix<double,6,6>::Zero();
+    Jstcom.block(0,0,3,6)= toEigen(JacCOM_lin).block(stl1,0,3,6);
+	Jstcom.block(3,0,3,6)= toEigen(JacCOM_lin).block(stl2,0,3,6);
+
+   Eigen::Matrix<double, 6, 12> Jstj= Eigen::Matrix<double,6,12>::Zero();
+    Jstj.block(0,0,3,12)=toEigen(JacCOM_lin).block(stl1,6,3,12);
+    Jstj.block(3,0,3,12)=toEigen(JacCOM_lin).block(stl2,6,3,12);
+
+  Eigen::Matrix<double, 6, 18> Jst= Eigen::Matrix<double,6,18>::Zero();
+ Jst.block(0,0,3,18)=toEigen(JacCOM_lin).block(stl1,0,3,18);
+    Jst.block(3,0,3,18)=toEigen(JacCOM_lin).block(stl2,0,3,18);
+
+   Eigen::Matrix<double, 6, 6> Jswcom= Eigen::Matrix<double,6,6>::Zero();
+    Jswcom.block(0,0,3,6)= toEigen(JacCOM_lin).block(swl1,0,3,6);
+	 Jswcom.block(3,0,3,6)= toEigen(JacCOM_lin).block(swl2,0,3,6);
+   Eigen::Matrix<double, 6, 12> Jswj=  Eigen::Matrix<double,6,12>::Zero();
+   Jswj.block(0,0,3,12)=toEigen(JacCOM_lin).block(swl1,6,3,12);
+   Jswj.block(3,0,3,12)=toEigen(JacCOM_lin).block(swl2,6,3,12);
+
+   // cost function quadratic matrix
+   Eigen::Matrix<double,6,30> Sigma= Eigen::Matrix<double,6,30>::Zero();
+   Sigma.block(0,18,6,6)= Eigen::Matrix<double,6,6>::Identity();
+   
+   Eigen::Matrix<double,6,30>  T_s= Jstcom.transpose()*Sigma;
+
+   Eigen::Matrix<double,6,6> eigenQ1= 50*Eigen::Matrix<double,6,6>::Identity();
+   Eigen::Matrix<double,30,30> eigenQ2= T_s.transpose()*eigenQ1*T_s;
+   Eigen::Matrix<double,30,30> eigenR= Eigen::Matrix<double,30,30>::Identity();
+   eigenR.block(24,24,6,6)=1000000000000*Eigen::Matrix<double,6,6>::Identity();
+   
+   Eigen::Matrix<double,30,30> eigenQ= eigenQ2+eigenR;
+ 
+
+	 
+   for ( int i = 0; i < eigenQ.rows(); i++ ){
+        for ( int j = 0; j < eigenQ.cols(); j++ )
+             Q(i,j) = eigenQ(i,j);
+    } 
+
+    // cost function linear matrix
+	Eigen::Matrix<double,30,1> eigenc= -T_s.transpose()*eigenQ1.transpose()*Wcom_des; 
+
+   for ( int i = 0; i < eigenc.rows(); i++ ){
+       for ( int j = 0; j < eigenc.cols(); j++ )
+             c(i) = eigenc(i,j);
+    }
+
+
+
+
+    alglib::minqpstate state;
+	// Create QP optimizer
+    alglib::minqpcreate(30,state);
+	alglib::minqpsetquadraticterm( state,Q);
+    alglib::minqpsetlinearterm(state,c);
+	
+	
+
+	//Equality constraints
+	Eigen::Matrix<double,12, 30> eigenA= Eigen::Matrix<double,12,30>::Zero();
+	
+	eigenA.block(0,0,6,6)=toEigen(MassMatrixCOM).block(0,0,6,6);
+
+	eigenA.block(0,18,6,6)=-Jstcom.transpose();
+
+    eigenA.block(6,0,6,6)=Jstcom;
+
+    eigenA.block(6,6,6,12)=Jstj;
+
+	//std::cout<<"eigenA"<<eigenA<<std::endl;
+
+    // Known term
+    Eigen::Matrix<double,12, 1> eigenb= Eigen::Matrix<double,12,1>::Zero();
+
+    Eigen::Matrix<double,6,1> Jdqdst= Eigen::Matrix<double,6,1>::Zero();
+	 Jdqdst<<toEigen(JdqdCOM_lin).block(stl1,0,3,1),
+	         toEigen(JdqdCOM_lin).block(stl2,0,3,1);
+			 
+    Eigen::Matrix<double,1,6> grav;
+	grav<<0,0,9.8,0,0,0;
+
+       Eigen::Matrix<double,6,1> fext_st;
+   fext_st.block(0,0,3,1)=fext.block(stl1,0,3,1);
+   fext_st.block(3,0,3,1)=fext.block(stl2,0,3,1);
+	eigenb.block(0,0,6,1)=-toEigen(BiasCOM).block(0,0,6,1)+Jstcom.transpose()*fext_st;
+
+	eigenb.block(6,0,6,1)=-Jdqdst;
+
+    //std::cout<<"eigenB"<<eigenb<<std::endl;
+    
+    
+    Eigen::Matrix<double,18,18> P=Eigen::Matrix<double,18,18>::Identity()-Jst.transpose()*(Jst*toEigen(MassMatrixCOM).inverse()*Jst.transpose()).inverse()*Jst*toEigen(MassMatrixCOM).inverse();
+   
+   
+	//Inequality Constraints
+
+	Eigen::Matrix<double,70,30> eigenD= Eigen::Matrix<double,70,30>::Zero();
+	
+	 // Torque limits
+	eigenD.block(10,6,12,12)=toEigen(MassMatrixCOM).block(6,6,12,12);
+
+    eigenD.block(10,18,12,6)=-Jstj.transpose();
+
+	eigenD.block(22,6,12,12)=-toEigen(MassMatrixCOM).block(6,6,12,12);
+
+    eigenD.block(22,18,12,6)=Jstj.transpose();
+    
+    eigenD.block(34,0,3,6)=Jswcom.block(0,0,3,6);
+
+    eigenD.block(34,6,3,12)=Jswj.block(0,0,3,12);
+
+	eigenD.block(37,0,3,6)=Jswcom.block(3,0,3,6);
+
+    eigenD.block(37,6,3,12)=Jswj.block(3,0,3,12);
+
+	eigenD.block(34,24,3,3)=-Eigen::Matrix<double,3,3>::Identity();
+
+	eigenD.block(37,27,3,3)=-Eigen::Matrix<double,3,3>::Identity();
+
+	eigenD.block(40,0,3,6)=-Jswcom.block(0,0,3,6);
+
+    eigenD.block(40,6,3,12)=-Jswj.block(0,0,3,12);
+
+	eigenD.block(43,0,3,6)=-Jswcom.block(3,0,3,6);
+
+    eigenD.block(43,6,3,12)=-Jswj.block(3,0,3,12);
+
+    eigenD.block(40,24,3,3)=-Eigen::Matrix<double,3,3>::Identity();
+
+	eigenD.block(43,27,3,3)=-Eigen::Matrix<double,3,3>::Identity();
+
+	eigenD.block(46,6,12,12)=Eigen::Matrix<double,12,12>::Identity();
+
+    eigenD.block(58,6,12,12)=-Eigen::Matrix<double,12,12>::Identity();
+    
+	//Friction
+	   double mu=1;
+	   Eigen::Matrix<double,3, 1> n= Eigen::Matrix<double,3,1>::Zero();
+	   n<< 0,
+	       0,
+		   1;
+
+	   Eigen::Matrix<double,3, 1> t1= Eigen::Matrix<double,3,1>::Zero();
+	   t1<< 1,
+	       0,
+		   0;
+
+       Eigen::Matrix<double,3, 1> t2= Eigen::Matrix<double,3,1>::Zero();
+	   t2<<0,
+	       1,
+		   0;
+
+	   Eigen::Matrix<double,5,3> cfr=Eigen::Matrix<double,5,3>::Zero();
+  
+	   cfr<<(-mu*n+t1).transpose(),
+	        (-mu*n+t2).transpose(),
+			-(mu*n+t1).transpose(),
+			-(mu*n+t2).transpose(),
+			-n.transpose();
+     
+	    Eigen::Matrix<double,10,6> Dfr=Eigen::Matrix<double,10,6>::Zero();
+
+		for(int i=0; i<2; i++)
+		{
+			Dfr.block(0+5*i,0+3*i,5,3)=cfr;
+		}
+		
+
+    eigenD.block(0,18,10,6)=Dfr;
+
+    //std::cout<<"eigenD"<<eigenD<<std::endl;
+    // Known terms for inequality
+	Eigen::Matrix<double,70, 1> eigenC= Eigen::Matrix<double,70,1>::Zero();
+	
+	// Torque limits
+    Eigen::Matrix<double,12,1> tau_max=60*Eigen::Matrix<double,12,1>::Ones();
+	Eigen::Matrix<double,12,1> tau_min=-60*Eigen::Matrix<double,12,1>::Ones();
+
+    Eigen::Matrix<double,12, 1> eigenBiascom=toEigen(BiasCOM).block(6,0,12,1);
+
+    
+	eigenC.block(10,0,12,1)=tau_max-eigenBiascom;
+	eigenC.block(22,0,12,1)=-(tau_min-eigenBiascom);
+    
+      // Joints limits
+     double deltat=0.01;
+     Eigen::Matrix<double,12, 1> eigenq=toEigen(q).block(6,0,12,1);
+	 Eigen::Matrix<double,12, 1> eigendq=toEigen(dq).block(6,0,12,1);
+	 Eigen::Matrix<double,12, 1> eigenqmin=toEigen(qmin);
+	 Eigen::Matrix<double,12, 1> eigenqmax=toEigen(qmax);
+	 Eigen::Matrix<double,12, 1> ddqmin=(2/pow(deltat,2))*(eigenqmin-eigenq-deltat*eigendq);
+	 Eigen::Matrix<double,12, 1> ddqmax=(2/pow(deltat,2))*(eigenqmax-eigenq-deltat*eigendq);
+
+     eigenC.block(46,0,12,1)=ddqmax;
+	 eigenC.block(58,0,12,1)=-ddqmin;
+
+
+	 Eigen::Matrix<double,6,1> Jdqdsw= Eigen::Matrix<double,6,1>::Zero();
+	 Jdqdsw<<toEigen(JdqdCOM_lin).block(swl1,0,3,1),
+	         toEigen(JdqdCOM_lin).block(swl2,0,3,1);
+ 
+	  Eigen::Matrix<double,6,1> fext_lambda= Eigen::Matrix<double,6,1>::Zero();
+
+	  Eigen::Matrix<double,18,18> Si;
+	  Si<<Eigen::Matrix<double,6,18>::Zero(),
+	      Eigen::Matrix<double,12,6>::Zero(),Eigen::Matrix<double,12,12>::Identity();
+    
+    
+	fext_lambda<<toEigen(JacCOM_lin).block(swl1,0,3,18)*(P*toEigen(MassMatrixCOM)+Eigen::Matrix<double,18,18>::Identity()-P).inverse()*P*toEigen(JacCOM_lin).transpose()*fext,
+	            toEigen(JacCOM_lin).block(swl2,0,3,18)*(P*toEigen(MassMatrixCOM)+Eigen::Matrix<double,18,18>::Identity()-P).inverse()*P*toEigen(JacCOM_lin).transpose()*fext;
+
+	  std::cout<<"fextl"<<fext_lambda<<std::endl;
+
+	iDynTree::MatrixDynSize Jac1(6,18);
+	iDynTree::MatrixDynSize Jac2(6,18);
+    kinDynComp.getFrameFreeFloatingJacobian(7,Jac2);
+	toEigen(Jac1)=toEigen(Jac2)*toEigen(T).inverse();
+
+	
+
+     std::cout<<"fextl"<<toEigen(JacCOM_lin).block(0,0,12,6).transpose()*fext<<std::endl;
+
+	std::cout<<"fextl"<<(toEigen(Jac1).block(0,0,3,18)*toEigen(MassMatrixCOM).inverse()*P*toEigen(Jac1).block(0,0,3,18).transpose()).inverse()*toEigen(Jac1).block(0,0,3,18)*toEigen(MassMatrixCOM).inverse()*Si.transpose()*P*toEigen(JacCOM_lin).transpose()*fext<<std::endl;
+	// Eigen::Matrix<double,6,6> Lambdasw1=(toEigen(JacCOM_lin).block(0,0,3,18)*Mc.inverse()*P*toEigen(JacCOM_lin).block(0,0,3,18).transpose()).inverse();
+	Eigen::Matrix<double,6,1> vdotsw_lambda;
+	vdotsw_lambda<<vdotswdes.block(0,0,3,1),
+	               vdotswdes.block(3,0,3,1);
+
+	 eigenC.block(34,0,6,1)= vdotsw_lambda-Jdqdsw-fext_lambda;
+	 eigenC.block(40,0,6,1)= -vdotsw_lambda+Jdqdsw+fext_lambda;
+	
+	  // std::cout<<"eigenc"<<eigenC<<std::endl;
+     //Linear constraints matrix
+    Eigen::Matrix<double,82, 31> eigenL= Eigen::Matrix<double,82,31>::Zero();
+
+   
+	eigenL<< eigenA,eigenb,
+	         eigenD, eigenC;
+
+    
+    
+   
+    for ( int i = 0; i < eigenL.rows(); i++ ){
+		 if (i < 12)
+            {
+				Lt(i) = 0.0; 
+			}
+        else
+           {
+            Lt(i) = -1.0; 
+		   }
+		   for ( int j = 0; j < eigenL.cols(); j++ )
+             L(i,j) = eigenL(i,j);
+    }
+    
+
+     
+    //Bounded constraints
+     /*Eigen::Matrix<double,30, 1> eigenBL= Eigen::Matrix<double,30,1>::Zero();
+     
+	 eigenBL.block(6,0,12,1)=ddqmin;
+
+     Eigen::Matrix<double,30, 1> eigenBU= Eigen::Matrix<double,30,1>::Zero();
+	
+	 eigenBU.block(6,0,12,1)=ddqmax;
+
+     for ( int i = 0; i < 30; i++ )
+    {  
+		if (i<6)
+	  {
+       bl(i) = alglib::fp_neginf;
+       bu(i) = alglib::fp_posinf;
+	   }
+       else if (i>=6 && i<18)
+	   { bl(i) = eigenBL(i,0);
+	     bu(i) = eigenBU(i,0);
+	    }
+		else
+		{
+	    bl(i) = alglib::fp_neginf;
+        bu(i) = alglib::fp_posinf;
+
+		}
+    };
+
+    bl(20)=0;
+    bl(23)=0;
+    bl(26)=0;
+	bl(29)=0;*/
+
+
+    
+    // Set qp
+   // alglib::minqpsetbc(state, bl, bu);
+    alglib::minqpsetlc(state, L, Lt);
+	alglib::minqpsetscaleautodiag(state);
+	alglib::real_1d_array x_;
+    
+    alglib::minqpreport rep;
+	alglib::minqpsetalgodenseaul(state, 1.0e-9, 1.0e+4, 15);
+    
+
+    alglib::minqpoptimize(state);
+
+	// Solve qp
+    alglib::minqpresults(state, x_, rep);
+
+   
+	for ( int j = 0; j < x_eigen.size(); j++ )
+             x_eigen(j)=x_(j);
+
+
+    std::cout<<"solution"<<x_eigen.block(18,0,6,1)<<std::endl;
+
+    
+	Eigen::VectorXd tau= Eigen::VectorXd::Zero(12);
+	tau=toEigen(MassMatrixCOM).block(6,6,12,12)*x_eigen.block(6,0,12,1)+eigenBiascom-Jstj.transpose()*x_eigen.block(18,0,6,1);
+	std::cout<<"acc"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*x_eigen.block(0,0,18,1)+toEigen(JdqdCOM_lin).block(swl1,0,3,1)<<std::endl;
+	std::cout<<"vel"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*toEigen(dq)<<std::endl;
+	return tau;
+
+}
