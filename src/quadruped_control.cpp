@@ -50,8 +50,9 @@ Eigen::VectorXd QUADRUPEDController::Cntr(Eigen::Matrix<double,6,1> &CoMPosDes,
 // Solve quadratic problem
 
   //tau=dogbot->qpproblem(Wcom_des);
+  //qpproblembr(Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes,  SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> &fext)
   tau=dogbot->qpproblem_cp(Wcom_des,m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl);
-  
+  //tau=dogbot->qpproblembr(Wcom_des,Matrix<double,12,1>::Zero());
   return tau;
 
 

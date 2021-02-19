@@ -36,7 +36,7 @@ class QUADRUPED
   Eigen::VectorXd qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::Vector3d vdotswdes,  SWING_LEG swingleg);
   //task per il moto di due gambe
   enum SWING_LEGS { L1, L2, L3}; // 4 legs, br-fl, bl-fr
-  Eigen::VectorXd qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes, SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> &fext);
+  Eigen::VectorXd qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes, SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> fext);
   // get function
 	Eigen::VectorXd getBiasMatrix();
 	Eigen::VectorXd getGravityMatrix();
