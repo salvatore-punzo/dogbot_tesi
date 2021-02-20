@@ -392,7 +392,7 @@ int main(int argc, char **argv){
      ros::Time begin = ros::Time::now();
      ROS_INFO_STREAM_ONCE("Starting control loop ...");
 	bool cpok = true; 
-	  while ((ros::Time::now()-begin).toSec() < tf-0.001 || cpok)
+	  while ((ros::Time::now()-begin).toSec() < tf-0.001 && cpok)
     { 
 		//prendo punto della traiettorie nell'ista desi 
 	
@@ -602,6 +602,7 @@ int main(int argc, char **argv){
 	if(cpok==false)
 	{
 		//traiettoria 1
+		cout<<"p0"<<endl;
 					double t_in=0.0, t_fin=0.2, t1;
 					ros::Time begin1 = ros::Time::now();
 					t1 = (ros::Time::now()-begin1).toSec();
@@ -617,7 +618,7 @@ int main(int argc, char **argv){
 					// Initial velocity
 					init_vel1= doggo->getCOMvel();
 					
-
+		cout<<"p1"<<endl;
 					end_vel1 = Matrix<double,6,1>::Zero();
 					end_vel1 = init_acc1 = end_acc1;
 					//std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
@@ -625,7 +626,7 @@ int main(int argc, char **argv){
 					trajectory_point traj_com;
 					traj_com = traiettoria->getTraj();
 		//TRAIETTORIA DELLE GAMBE 1
-					
+					cout<<"p2"<<endl;
 					
 					Matrix<double,6,1> pos_ini, pos_fin, vel_ini, vel_fin, acc_ini, acc_fin;
 
@@ -635,7 +636,7 @@ int main(int argc, char **argv){
 					// Desired position
 					pos_fin<<(cpx+0.2-coo_ee_br(0))/2, 0, 0.5, 0,0,0;
 				
-					
+					cout<<"p3"<<endl;
 
 					vel_fin = Matrix<double,6,1>::Zero();
 					vel_fin = acc_ini = acc_fin =vel_ini;
@@ -645,7 +646,7 @@ int main(int argc, char **argv){
 
 					
 					
-
+		cout<<"p4"<<endl;
 
 		while((ros::Time::now()-begin1).toSec() < t_fin-0.001)
 		{
@@ -665,7 +666,7 @@ int main(int argc, char **argv){
 					footveldes<<traj1.vel(0,idx1), traj1.vel(1,idx1), traj1.vel(2,idx1),MatrixXd::Zero(3,1);
 					footaccdes<<traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1),traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1);
 					// Compute deltax, deltav (modificato)
-
+		cout<<"p5"<<endl;
 					Eigen::Matrix<double,6,1> deltax= composdes-doggo->getCOMpos();
 					Eigen::Matrix<double,6,1> deltav= comveldes-doggo->getCOMvel();
 
@@ -688,7 +689,7 @@ int main(int argc, char **argv){
 									Eigen::VectorXd tau_step;
 									tau_step.resize(12);
 									tau_step = doggo->qpproblembr(Wcom_des,footaccdes,QUADRUPED::SWING_LEGS::L2, Eigen::Matrix<double,12,1>::Zero());
-							
+							cout<<"p6"<<endl;
 							
 							//pubblico le tau
 					std::cout<<"tau_step"<<tau_step<<std::endl;
@@ -721,13 +722,14 @@ int main(int argc, char **argv){
 					//Sending command
 						_tau_pub.publish(tau_step_msg);
 		}
+		cout<<"p7"<<endl;
 		//traiettoria 2 del com
 					double t_in2=0.0, t_fin2=0.2, t2;
 					ros::Time begin2 = ros::Time::now();
 					t2 = (ros::Time::now()-begin1).toSec();
 					//traiettoria del centro di massa
 					Matrix<double,6,1> init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2;
-
+		cout<<"p8"<<endl;
 					// Initial position
 					init_pos2= doggo->getCOMpos();
 					
@@ -745,7 +747,7 @@ int main(int argc, char **argv){
 					trajectory_point traj_com2;
 					traj_com2 = traiettoria->getTraj();
 		//TRAIETTORIA DELLE GAMBE 2
-					
+				cout<<"p9"<<endl;	
 					
 					Matrix<double,6,1> pos_ini2, pos_fin2, vel_ini2, vel_fin2, acc_ini2, acc_fin2;
 
@@ -775,7 +777,7 @@ int main(int argc, char **argv){
 					composdes<<traj_com2.pos(0,idx2), traj_com2.pos(1,idx2), traj_com2.pos(2,idx2),MatrixXd::Zero(3,1);
 					comveldes<<traj_com2.vel(0,idx2), traj_com2.vel(1,idx2), traj_com2.vel(2,idx2),MatrixXd::Zero(3,1);
 					comaccdes<<traj_com2.acc(0,idx2), traj_com2.acc(1,idx2), traj_com2.acc(2,idx2),MatrixXd::Zero(3,1);
-
+cout<<"p10"<<endl;
 
 					//traiettoria per le gambe
 					Matrix<double,6,1> footposdes, footveldes, footaccdes;
