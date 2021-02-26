@@ -1536,7 +1536,7 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 		stl2=9; 
 		 break;
 	}
-
+std::cout<<"a"<<endl;
 	// Set variables
    int variables=30;
    alglib::real_2d_array Q, R, L;
@@ -1570,6 +1570,7 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
    Eigen::Matrix<double, 6, 12> Jswj=  Eigen::Matrix<double,6,12>::Zero();
    Jswj.block(0,0,3,12)=toEigen(JacCOM_lin).block(swl1,6,3,12);
    Jswj.block(3,0,3,12)=toEigen(JacCOM_lin).block(swl2,6,3,12);
+std::cout<<"a1"<<endl;
 
    // cost function quadratic matrix
    Eigen::Matrix<double,6,30> Sigma= Eigen::Matrix<double,6,30>::Zero();
@@ -1584,6 +1585,7 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
    
    Eigen::Matrix<double,30,30> eigenQ= eigenQ2+eigenR;
  
+std::cout<<"a2"<<endl;
 
 	 
    for ( int i = 0; i < eigenQ.rows(); i++ ){
@@ -1599,16 +1601,23 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
              c(i) = eigenc(i,j);
     }
 
+std::cout<<"a21"<<endl;
+std::cout<<"eigenc: "<<endl<<eigenc<<endl;
 
 
 
     alglib::minqpstate state;
 	// Create QP optimizer
     alglib::minqpcreate(30,state);
+	std::cout<<"a22"<<endl;
+
 	alglib::minqpsetquadraticterm( state,Q);
-    alglib::minqpsetlinearterm(state,c);
+	std::cout<<"a23"<<endl;
+
+    alglib::minqpsetlinearterm(state,c); //
 	
-	
+	std::cout<<"a3"<<endl;
+
 
 	//Equality constraints
 	Eigen::Matrix<double,12, 30> eigenA= Eigen::Matrix<double,12,30>::Zero();
@@ -1849,15 +1858,18 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
     alglib::minqpsetlc(state, L, Lt);
 	alglib::minqpsetscaleautodiag(state);
 	alglib::real_1d_array x_;
-    
+    std::cout<<"a4"<<endl;
+
     alglib::minqpreport rep;
 	alglib::minqpsetalgodenseaul(state, 1.0e-9, 1.0e+4, 15);
-    
+    std::cout<<"a5"<<endl;
+
 
     alglib::minqpoptimize(state);
 
 	// Solve qp
     alglib::minqpresults(state, x_, rep);
+std::cout<<"a6"<<endl;
 
    
 	for ( int j = 0; j < x_eigen.size(); j++ )
@@ -1872,5 +1884,6 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 	std::cout<<"acc"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*x_eigen.block(0,0,18,1)+toEigen(JdqdCOM_lin).block(swl1,0,3,1)<<std::endl;
 	std::cout<<"vel"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*toEigen(dq)<<std::endl;
 	return tau;
+std::cout<<"a7"<<endl;
 
 }

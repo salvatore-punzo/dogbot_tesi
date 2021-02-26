@@ -41,6 +41,7 @@
 #include "capture_point.h"
 #include "prob_quadratico_cp.h"
 #include "quadruped_control.h"
+#include "quadruped_step.h"
 
 #include <fstream>
 #include <sstream>
@@ -244,6 +245,10 @@ int main(int argc, char **argv){
 	// Set controller Viviana
     QUADRUPEDController *doggoControl; //controller_(doggo);
 	doggoControl = new QUADRUPEDController(*doggo);
+
+	//Step Control
+	QUADRUPEDStep *doggoStep;
+	doggoStep = new QUADRUPEDStep(*doggo);
 	
 	
 	//Start node
@@ -373,7 +378,7 @@ int main(int argc, char **argv){
 	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
 	//traiettoria
-	double ti=0.0, tf=0.6, t=0.0;
+	double ti=0.0, tf=1.5, t=0.0;
 	
 	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
 
@@ -406,7 +411,7 @@ int main(int argc, char **argv){
 	 ts = ros::Time::now();
      ROS_INFO_STREAM_ONCE("Starting control loop ...");
 	bool cpok = true; 
-	  while ((ros::Time::now()-begin).toSec() < tf-0.001 && cpok)
+	  while ((ros::Time::now()-begin).toSec() < tf-0.001)// && cpok)
     { 
 		//prendo punto della traiettorie nell'ista desi 
 	
@@ -511,8 +516,8 @@ int main(int argc, char **argv){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
 				}
 				//controllo senza capture point
-				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
-				vector<double> tau = ottim->getTau();
+				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
+				//vector<double> tau = ottim->getTau();
 				float x_inf, x_sup, y_inf, y_sup;
 				x_inf = coo_ee_bl(0);
 				x_sup = coo_ee_br(0);
@@ -567,7 +572,7 @@ int main(int argc, char **argv){
 				_x_lim_pub.publish(x_lim);
 
 				//--------------------pubblico le coppie calcolate --------------------
-
+				/*
 				// copy in the data
 				
 				msg_ctrl.data.clear();
@@ -581,9 +586,9 @@ int main(int argc, char **argv){
 				tau_file<<"\n";
 				tau_file.flush();
 				_tau_pub.publish(msg_ctrl);
-
+				*/
 				//-------------------------------coppie per controllo Viviana
-		/*		
+				
 				// Compute control torque
 				// control vector
       			Eigen::VectorXd tau;
@@ -620,7 +625,7 @@ int main(int argc, char **argv){
 
 				//Sending command
 					_tau_pub.publish(tau1_msg);
-*/
+
 //-----------------------------------------------------
 			}
 				// One step in gazebo world ( to use if minqp problem takes too long for control loop)
@@ -702,10 +707,7 @@ int main(int argc, char **argv){
 					footposdes<<traj1.pos(0,idx1), traj1.pos(1,idx1), traj1.pos(2,idx1),MatrixXd::Zero(3,1);
 					footveldes<<traj1.vel(0,idx1), traj1.vel(1,idx1), traj1.vel(2,idx1),MatrixXd::Zero(3,1);
 					footaccdes<<traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1),traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1);
-					// Compute deltax, deltav (modificato)
-			
-					Eigen::Matrix<double,6,1> deltax= composdes-doggo->getCOMpos();
-					Eigen::Matrix<double,6,1> deltav= comveldes-doggo->getCOMvel();
+					
 					MatrixXd com_pos = doggo->getCOMpos();
 					MatrixXd com_vel=doggo->getCOMvel();
 					//scrivo dati su file
@@ -723,28 +725,17 @@ int main(int argc, char **argv){
 					tempo_simulazione_file<<ts<<"\n";
 					tempo_simulazione_file.flush();
 
-					// Compute desired CoM Wrench
-					double mass_robot=doggo->getMass();
+					
 
-					Eigen::MatrixXd g_acc=Eigen::MatrixXd::Zero(6,1);
 					
-					g_acc(2,0)=9.81;
-					
-					Eigen::Matrix<double,18,1> deltag=doggo->getBiasMatrixCOM();
-					
-					const int n=doggo->getDoFsnumber();
-					Eigen::MatrixXd M_com=doggo->getMassMatrixCOM_com();
-
-					Eigen::Matrix<double,6,1> Wcom_des=Kcom*deltax+Dcom*deltav+mass_robot*g_acc+M_com*comaccdes;
-									//qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes,  SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> &fext)
-									// control vector
-									Eigen::VectorXd tau_step;
-									tau_step.resize(12);
-									tau_step = doggo->qpproblembr(Wcom_des,footaccdes,QUADRUPED::SWING_LEGS::L2, Eigen::Matrix<double,12,1>::Zero());
+					// control vector
+					Eigen::VectorXd tau_step;
+					tau_step.resize(12);
+					tau_step = doggoStep->step(composdes,comveldes,comaccdes,Kcom,Dcom,footaccdes);
 							
 					
 							
-							//pubblico le tau
+					//pubblico le tau
 					std::cout<<"tau_step"<<tau_step<<std::endl;
 					// Set command message
 					tau_step_msg.data.clear();
@@ -781,10 +772,10 @@ int main(int argc, char **argv){
 						ros::spinOnce();
 		}
 		
-					//traiettoria 2 del com
+					//-------------------------traiettoria 2 del com--------------------------
 					double t_in2=0.0, t_fin2=0.2, t2;
 					ros::Time begin2 = ros::Time::now();
-					t2 = (ros::Time::now()-begin1).toSec();
+					t2 = (ros::Time::now()-begin2).toSec();
 					//traiettoria del centro di massa
 					Matrix<double,6,1> init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2;
 		
@@ -824,7 +815,7 @@ int main(int argc, char **argv){
 					traj2 = traiettoria->getTraj();
 
 
-					//
+					
 			while((ros::Time::now()-begin2).toSec() < t_fin2-0.001)
 		{
 			int idx2= std::round( t2*1000);
@@ -845,10 +836,9 @@ int main(int argc, char **argv){
 					footposdes<<traj2.pos(0,idx2), traj2.pos(1,idx2), traj2.pos(2,idx2),MatrixXd::Zero(3,1);
 					footveldes<<traj2.vel(0,idx2), traj2.vel(1,idx2), traj2.vel(2,idx2),MatrixXd::Zero(3,1);
 					footaccdes<<traj2.acc(0,idx2), traj2.acc(1,idx2), traj2.acc(2,idx2),traj2.acc(0,idx2), traj2.acc(1,idx2), traj2.acc(2,idx2);
-					// Compute deltax, deltav (modificato)
 
-					Eigen::Matrix<double,6,1> deltax= composdes-doggo->getCOMpos();
-					Eigen::Matrix<double,6,1> deltav= comveldes-doggo->getCOMvel();
+
+					
 					MatrixXd com_pos = doggo->getCOMpos();
 					MatrixXd com_vel=doggo->getCOMvel();
 					//scrivo dati su file
@@ -866,25 +856,12 @@ int main(int argc, char **argv){
 					tempo_simulazione_file<<ts<<"\n";
 					tempo_simulazione_file.flush();
 
-					// Compute desired CoM Wrench
-					double mass_robot=doggo->getMass();
-
-					Eigen::MatrixXd g_acc=Eigen::MatrixXd::Zero(6,1);
 					
-					g_acc(2,0)=9.81;
-					
-					Eigen::Matrix<double,18,1> deltag=doggo->getBiasMatrixCOM();
-					
-					const int n=doggo->getDoFsnumber();
-					Eigen::MatrixXd M_com=doggo->getMassMatrixCOM_com();
-
-					Eigen::Matrix<double,6,1> Wcom_des=Kcom*deltax+Dcom*deltav+mass_robot*g_acc+M_com*comaccdes;
-									//qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes,  SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> &fext)
-									// control vector
-									Eigen::VectorXd tau_step;
-									tau_step.resize(12);
-									tau_step = doggo->qpproblembr(Wcom_des,footaccdes,QUADRUPED::SWING_LEGS::L2, Eigen::Matrix<double,12,1>::Zero());
-							
+					// control vector
+					Eigen::VectorXd tau_step;
+					tau_step.resize(12);
+					tau_step = doggoStep->step(composdes,comveldes,comaccdes,Kcom,Dcom,footaccdes);
+								
 					//pubblico le tau
 					std::cout<<"tau_step"<<tau_step<<std::endl;
 					// Set command message
