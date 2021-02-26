@@ -42,6 +42,8 @@
 #include "prob_quadratico_cp.h"
 #include "quadruped_control.h"
 
+#include <fstream>
+#include <sstream>
 
 using namespace Eigen;
 using namespace std;
@@ -65,7 +67,8 @@ Matrix<double, 18,1> q_joints_total, dq_joints_total;
 Matrix<double,6,1> floating_base_pose, floating_base_posed;
 Matrix<double,3,1> floating_base_orientation; //posso inserirla come variabile locale alla callback modelState
 double com_zdes = 0.4;
-float  cpx, cpy;
+float  cpx, cpy,w;
+ros::Time ts;
 //Vector3d com_pos,com_vel;
 
 
@@ -210,6 +213,12 @@ void modelState_cb( const gazebo_msgs::ModelStates &pt){
 
 int main(int argc, char **argv){
 	string modelFile="/home/salvatore/ros_ws/src/DogBotV4/ROS/src/dogbot_description/urdf/dogbot.urdf";
+	std::ofstream com_file("com_file.txt");
+	std::ofstream foothold_file("foothold.txt");
+	std::ofstream capture_point_file("capture_point.txt");
+	std::ofstream tempo_simulazione_file("tempo_simulazione.txt");
+	std::ofstream com_traiettoria_des_file("com_traiettoria_des.txt");
+	std::ofstream tau_file("tau.txt");
 
 	CIN_DIR  *leglength; 
 	leglength = new CIN_DIR;
@@ -264,6 +273,8 @@ int main(int argc, char **argv){
 	ros::Publisher _tau_pub = _nh.advertise<std_msgs::Float64MultiArray>("/dogbot/joint_position_controller/command",1);
 	//ros::Publisher _errore_pub = _nh.advertise<std_msgs::Float64>("/errore",1);
 	ros::Publisher _foothold_pub = _nh.advertise<std_msgs::Float64MultiArray>("/foothold",1);
+	ros::Publisher _cp_pub = _nh.advertise<geometry_msgs::Point>("/cp",1);
+	ros::Publisher _x_lim_pub = _nh.advertise<std_msgs::Float64MultiArray>("/x_lim",1);
 	
 	//Service 
 	ros::ServiceClient set_model_configuration_srv = _nh.serviceClient<gazebo_msgs::SetModelConfiguration>("/gazebo/set_model_configuration");
@@ -285,6 +296,8 @@ int main(int argc, char **argv){
 		std_msgs::Float64MultiArray tau_step_msg;
 	//Topic per grafico
 		std_msgs::Float64MultiArray foothold;
+		geometry_msgs::Point capture_p;
+		std_msgs::Float64MultiArray x_lim;
 
 	    // Start the robot in position (stand up) 
       gazebo_msgs::SetModelConfiguration robot_init_config;
@@ -360,7 +373,7 @@ int main(int argc, char **argv){
 	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
 	//traiettoria
-	double ti=0.0, tf=1.5, t=0.0;
+	double ti=0.0, tf=0.6, t=0.0;
 	
 	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
 
@@ -390,6 +403,7 @@ int main(int argc, char **argv){
 
 		// initial simulation time 
      ros::Time begin = ros::Time::now();
+	 ts = ros::Time::now();
      ROS_INFO_STREAM_ONCE("Starting control loop ...");
 	bool cpok = true; 
 	  while ((ros::Time::now()-begin).toSec() < tf-0.001 && cpok)
@@ -417,6 +431,11 @@ int main(int argc, char **argv){
                 Matrix<double,6,18> Jcomdot=doggo->getJCOMDot();				
 				MatrixXd com_pos=doggo->getCOMpos();				
                 MatrixXd com_vel=doggo->getCOMvel();
+				com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
+				com_file.flush();
+				ts = ros::Time::now();
+				tempo_simulazione_file<<ts<<"\n";
+				tempo_simulazione_file.flush();
 				//cout<<"b:"<<endl<<b<<endl;				
 				// Time
          		t = (ros::Time::now()-begin).toSec();
@@ -428,6 +447,8 @@ int main(int argc, char **argv){
 				comveldes<<traj.vel(0,idx), traj.vel(1,idx), traj.vel(2,idx),MatrixXd::Zero(3,1);
 				
 				comaccdes<<traj.acc(0,idx), traj.acc(1,idx), traj.acc(2,idx),MatrixXd::Zero(3,1);
+				com_traiettoria_des_file<<composdes(0)<<" "<<composdes(1)<<" "<<composdes(2)<<" "<<composdes(3)<<" "<<composdes(4)<<" "<<composdes(5)<<"\n";
+				com_traiettoria_des_file.flush();
 /*
 				cout<<"com posizione desiderata:"<<endl<<composdes<<endl;
 				cout<<"com velocità desiderata:"<<endl<<comveldes<<endl;
@@ -490,31 +511,39 @@ int main(int argc, char **argv){
 					cout<<"joint "<<i<<": "<<q_joints_total[i]<<endl;
 				}
 				//controllo senza capture point
-				//ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
-				//vector<double> tau = ottim->getTau();
-				float x_inf, x_sup, y_inf, y_sup, w;
+				ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
+				vector<double> tau = ottim->getTau();
+				float x_inf, x_sup, y_inf, y_sup;
 				x_inf = coo_ee_bl(0);
 				x_sup = coo_ee_br(0);
     			y_inf = coo_ee_bl(1);
     			y_sup = coo_ee_fl(1);
 				//Controllo con capture point
-				ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot,
-				 m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl, x_inf, x_sup, y_inf, y_sup);
-				vector<double> tau = ottim_cp->getTau();
+				//ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot,
+				 //m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl, x_inf, x_sup, y_inf, y_sup);
+				//vector<double> tau = ottim_cp->getTau();
 
 				//controllo sul capture point e traiettoria
 				w=sqrt(9.81/com_zdes);
 				cpx = com_pos(0)+com_vel(0)/w;
 				cpy = com_pos(1)+com_vel(1)/w;
+				cout<<"cpx-main: "<<cpx<<endl;
 				//supponendo la spinta con la stessa direzione dell'asse x
-				ros::Time begin1 = ros::Time::now();
+				capture_p.x=cpx;
+				capture_p.y=cpy;
+				_cp_pub.publish(capture_p);
+				capture_point_file<<cpx<<" "<<cpy<<"\n";
+				capture_point_file.flush();
 				if(cpx > x_sup)
 				{	
 					cpok = false;
 					
 				}
 
-
+				foothold_file<<coo_ee_bl(0)<<" "<<coo_ee_bl(1)<<" "<<coo_ee_bl(2)<<" "<<coo_ee_br(0)<<" "
+				<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "
+				<<coo_ee_fr(0)<<" "<<coo_ee_fr(1)<<" "<<coo_ee_fr(2)<<" "<<"\n";
+				foothold_file.flush();
 				//pubblico i foothold
 				foothold.data.clear();
 				foothold.data.push_back(coo_ee_bl(0));
@@ -532,6 +561,10 @@ int main(int argc, char **argv){
 
 				_foothold_pub.publish(foothold);
 
+				
+
+				x_lim.data.push_back(x_sup);
+				_x_lim_pub.publish(x_lim);
 
 				//--------------------pubblico le coppie calcolate --------------------
 
@@ -542,9 +575,11 @@ int main(int argc, char **argv){
 				//stampa tau e controlla anche il topic command
 				for(int i =0; i<12; i++){
 					cout<<"tau: "<<tau[11-i]<<endl;
+					tau_file<<tau[11-i]<<" ";
 					msg_ctrl.data.push_back(tau[i]);
 				}
-				
+				tau_file<<"\n";
+				tau_file.flush();
 				_tau_pub.publish(msg_ctrl);
 
 				//-------------------------------coppie per controllo Viviana
@@ -598,11 +633,11 @@ int main(int argc, char **argv){
 		
 		
 	}
-
+/*
 	if(cpok==false)
 	{
 		//traiettoria 1
-		cout<<"p0"<<endl;
+					
 					double t_in=0.0, t_fin=0.2, t1;
 					ros::Time begin1 = ros::Time::now();
 					t1 = (ros::Time::now()-begin1).toSec();
@@ -618,15 +653,15 @@ int main(int argc, char **argv){
 					// Initial velocity
 					init_vel1= doggo->getCOMvel();
 					
-		cout<<"p1"<<endl;
+		 
 					end_vel1 = Matrix<double,6,1>::Zero();
 					end_vel1 = init_acc1 = end_acc1;
 					//std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
 					traiettoria = new TrajPlanner(t_in, t_fin, init_pos1, end_pos1, init_vel1, end_vel1, init_acc1, end_acc1);
 					trajectory_point traj_com;
 					traj_com = traiettoria->getTraj();
-		//TRAIETTORIA DELLE GAMBE 1
-					cout<<"p2"<<endl;
+		 //TRAIETTORIA DELLE GAMBE 1
+					
 					
 					Matrix<double,6,1> pos_ini, pos_fin, vel_ini, vel_fin, acc_ini, acc_fin;
 
@@ -636,7 +671,7 @@ int main(int argc, char **argv){
 					// Desired position
 					pos_fin<<(cpx+0.2-coo_ee_br(0))/2, 0, 0.5, 0,0,0;
 				
-					cout<<"p3"<<endl;
+					
 
 					vel_fin = Matrix<double,6,1>::Zero();
 					vel_fin = acc_ini = acc_fin =vel_ini;
@@ -646,7 +681,7 @@ int main(int argc, char **argv){
 
 					
 					
-		cout<<"p4"<<endl;
+		 
 
 		while((ros::Time::now()-begin1).toSec() < t_fin-0.001)
 		{
@@ -658,7 +693,9 @@ int main(int argc, char **argv){
 					composdes<<traj.pos(0,idx1), traj.pos(1,idx1), traj.pos(2,idx1),MatrixXd::Zero(3,1);
 					comveldes<<traj.vel(0,idx1), traj.vel(1,idx1), traj.vel(2,idx1),MatrixXd::Zero(3,1);
 					comaccdes<<traj.acc(0,idx1), traj.acc(1,idx1), traj.acc(2,idx1),MatrixXd::Zero(3,1);
-
+					//scrivo dati su file
+					com_traiettoria_des_file<<composdes(0)<<" "<<composdes(1)<<" "<<composdes(2)<<" "<<composdes(3)<<" "<<composdes(4)<<" "<<composdes(5)<<"\n";
+					com_traiettoria_des_file.flush();
 
 					//traiettoria per le gambe
 					Matrix<double,6,1> footposdes, footveldes, footaccdes;
@@ -666,10 +703,25 @@ int main(int argc, char **argv){
 					footveldes<<traj1.vel(0,idx1), traj1.vel(1,idx1), traj1.vel(2,idx1),MatrixXd::Zero(3,1);
 					footaccdes<<traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1),traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1);
 					// Compute deltax, deltav (modificato)
-		cout<<"p5"<<endl;
+			
 					Eigen::Matrix<double,6,1> deltax= composdes-doggo->getCOMpos();
 					Eigen::Matrix<double,6,1> deltav= comveldes-doggo->getCOMvel();
-
+					MatrixXd com_pos = doggo->getCOMpos();
+					MatrixXd com_vel=doggo->getCOMvel();
+					//scrivo dati su file
+					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
+					com_file.flush();
+					cpx = com_pos(0)+com_vel(0)/w;
+					cpy = com_pos(1)+com_vel(1)/w;
+					capture_point_file<<cpx<<" "<<cpy<<"\n";
+					capture_point_file.flush();
+					foothold_file<<coo_ee_bl(0)<<" "<<coo_ee_bl(1)<<" "<<coo_ee_bl(2)<<" "<<coo_ee_br(0)<<" "
+					<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "
+					<<coo_ee_fr(0)<<" "<<coo_ee_fr(1)<<" "<<coo_ee_fr(2)<<" "<<"\n";
+					foothold_file.flush();
+					ts = ros::Time::now();
+					tempo_simulazione_file<<ts<<"\n";
+					tempo_simulazione_file.flush();
 
 					// Compute desired CoM Wrench
 					double mass_robot=doggo->getMass();
@@ -689,7 +741,8 @@ int main(int argc, char **argv){
 									Eigen::VectorXd tau_step;
 									tau_step.resize(12);
 									tau_step = doggo->qpproblembr(Wcom_des,footaccdes,QUADRUPED::SWING_LEGS::L2, Eigen::Matrix<double,12,1>::Zero());
-							cout<<"p6"<<endl;
+							
+					
 							
 							//pubblico le tau
 					std::cout<<"tau_step"<<tau_step<<std::endl;
@@ -715,21 +768,26 @@ int main(int argc, char **argv){
 					// Fill Command message
 					for(int i=0; i<12; i++)
 					{
-				
+						tau_file<<ta[11-i]<<" ";
 						tau_step_msg.data.push_back(ta[i]);
 					}
-
+					tau_file<<"\n";
+					tau_file.flush();
 					//Sending command
 						_tau_pub.publish(tau_step_msg);
+
+						pub->Publish(stepper);
+				
+						ros::spinOnce();
 		}
-		cout<<"p7"<<endl;
-		//traiettoria 2 del com
+		
+					//traiettoria 2 del com
 					double t_in2=0.0, t_fin2=0.2, t2;
 					ros::Time begin2 = ros::Time::now();
 					t2 = (ros::Time::now()-begin1).toSec();
 					//traiettoria del centro di massa
 					Matrix<double,6,1> init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2;
-		cout<<"p8"<<endl;
+		
 					// Initial position
 					init_pos2= doggo->getCOMpos();
 					
@@ -746,8 +804,8 @@ int main(int argc, char **argv){
 					traiettoria = new TrajPlanner(t_in2, t_fin2, init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2);
 					trajectory_point traj_com2;
 					traj_com2 = traiettoria->getTraj();
-		//TRAIETTORIA DELLE GAMBE 2
-				cout<<"p9"<<endl;	
+					//TRAIETTORIA DELLE GAMBE 2
+					
 					
 					Matrix<double,6,1> pos_ini2, pos_fin2, vel_ini2, vel_fin2, acc_ini2, acc_fin2;
 
@@ -777,7 +835,10 @@ int main(int argc, char **argv){
 					composdes<<traj_com2.pos(0,idx2), traj_com2.pos(1,idx2), traj_com2.pos(2,idx2),MatrixXd::Zero(3,1);
 					comveldes<<traj_com2.vel(0,idx2), traj_com2.vel(1,idx2), traj_com2.vel(2,idx2),MatrixXd::Zero(3,1);
 					comaccdes<<traj_com2.acc(0,idx2), traj_com2.acc(1,idx2), traj_com2.acc(2,idx2),MatrixXd::Zero(3,1);
-cout<<"p10"<<endl;
+					//scrivo dati su file
+					com_traiettoria_des_file<<composdes(0)<<" "<<composdes(1)<<" "<<composdes(2)<<" "<<composdes(3)<<" "<<composdes(4)<<" "<<composdes(5)<<"\n";
+					com_traiettoria_des_file.flush();
+
 
 					//traiettoria per le gambe
 					Matrix<double,6,1> footposdes, footveldes, footaccdes;
@@ -788,7 +849,22 @@ cout<<"p10"<<endl;
 
 					Eigen::Matrix<double,6,1> deltax= composdes-doggo->getCOMpos();
 					Eigen::Matrix<double,6,1> deltav= comveldes-doggo->getCOMvel();
-
+					MatrixXd com_pos = doggo->getCOMpos();
+					MatrixXd com_vel=doggo->getCOMvel();
+					//scrivo dati su file
+					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
+					com_file.flush();
+					cpx = com_pos(0)+com_vel(0)/w;
+					cpy = com_pos(1)+com_vel(1)/w;
+					capture_point_file<<cpx<<" "<<cpy<<"\n";
+					capture_point_file.flush();
+					foothold_file<<coo_ee_bl(0)<<" "<<coo_ee_bl(1)<<" "<<coo_ee_bl(2)<<" "<<coo_ee_br(0)<<" "
+					<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "
+					<<coo_ee_fr(0)<<" "<<coo_ee_fr(1)<<" "<<coo_ee_fr(2)<<" "<<"\n";
+					foothold_file.flush();
+					ts = ros::Time::now();
+					tempo_simulazione_file<<ts<<"\n";
+					tempo_simulazione_file.flush();
 
 					// Compute desired CoM Wrench
 					double mass_robot=doggo->getMass();
@@ -833,15 +909,20 @@ cout<<"p10"<<endl;
 					// Fill Command message
 					for(int i=0; i<12; i++)
 					{
-				
+						tau_file<<ta[11-i]<<" ";
 						tau_step_msg.data.push_back(ta[i]);
 					}
-
+					tau_file<<"\n";
+					tau_file.flush();
 					//Sending command
 						_tau_pub.publish(tau_step_msg);
+						
+						pub->Publish(stepper);
+				
+						ros::spinOnce();
 		}
 	}
-
+ */
  //pase gazebo call
  pauseGazebo.call(pauseSrv);
  	

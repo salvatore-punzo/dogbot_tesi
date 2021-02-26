@@ -152,6 +152,7 @@ src/traj_planner.cpp
 src/capture_point.cpp
 src/prob_quadratico_cp.cpp
 src/quadruped_control.cpp
+src/quadruped_step.cpp
 
 
 src/alglib/ap.cpp
@@ -182,6 +183,7 @@ src/traj_planner.cpp
 src/capture_point.cpp
 src/prob_quadratico_cp.cpp
 src/quadruped_control.cpp
+src/quadruped_step.cpp
 
 src/alglib/ap.cpp
 src/alglib/alglibinternal.cpp

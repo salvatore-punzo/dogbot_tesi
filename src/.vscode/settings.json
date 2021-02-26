@@ -60,6 +60,8 @@
         "random": "cpp",
         "set": "cpp",
         "string": "cpp",
-        "string_view": "cpp"
+        "string_view": "cpp",
+        "core": "cpp",
+        "unordered_set": "cpp"
     }
 }
