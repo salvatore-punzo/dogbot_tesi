@@ -43,7 +43,7 @@ VectorXd QUADRUPEDStep::step(Eigen::Matrix<double,6,1> &CoMPosDes,
     Eigen::VectorXd tau= Eigen::VectorXd::Zero(12);
 
   //solve quadratic problem
-
+  std::cout<<"CoMAccDes: "<<endl<<CoMAccDes<<endl;
   tau=dogbot->qpproblembr( Wcom_des, footaccdes,  QUADRUPED::SWING_LEGS::L2, Eigen::Matrix<double,12,1>::Zero());
   return tau;
 }

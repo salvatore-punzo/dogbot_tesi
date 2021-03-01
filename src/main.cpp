@@ -68,7 +68,8 @@ Matrix<double, 18,1> q_joints_total, dq_joints_total;
 Matrix<double,6,1> floating_base_pose, floating_base_posed;
 Matrix<double,3,1> floating_base_orientation; //posso inserirla come variabile locale alla callback modelState
 double com_zdes = 0.4;
-float  cpx, cpy,w;
+float w=sqrt(9.81/com_zdes);
+float  cpx, cpy;
 ros::Time ts;
 //Vector3d com_pos,com_vel;
 
@@ -220,6 +221,7 @@ int main(int argc, char **argv){
 	std::ofstream tempo_simulazione_file("tempo_simulazione.txt");
 	std::ofstream com_traiettoria_des_file("com_traiettoria_des.txt");
 	std::ofstream tau_file("tau.txt");
+	std::ofstream x_lim_file("x_lim_poligono.txt");
 
 	CIN_DIR  *leglength; 
 	leglength = new CIN_DIR;
@@ -394,11 +396,9 @@ int main(int argc, char **argv){
 
 	end_vel = Matrix<double,6,1>::Zero();
 	end_vel = init_acc = end_acc;
-	//std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
+
 	traiettoria = new TrajPlanner(ti, tf, init_pos, end_pos, init_vel, end_vel, init_acc, end_acc);
-	//tf=0.2
-	//calcola due spline separate: una che la fa salire e l'altra scendere (zc=0.05 altezza massima desiderata)
-	//init_pos=0,0,0; end_pos=offset/2,0,offset; nella seconda init pos= endpos prece end_ponew = offset,0,0
+	
 	trajectory_point traj;
      traj = traiettoria->getTraj();
 	 
@@ -411,7 +411,7 @@ int main(int argc, char **argv){
 	 ts = ros::Time::now();
      ROS_INFO_STREAM_ONCE("Starting control loop ...");
 	bool cpok = true; 
-	  while ((ros::Time::now()-begin).toSec() < tf-0.001)// && cpok)
+	  while ((ros::Time::now()-begin).toSec() < tf-0.001 && cpok)
     { 
 		//prendo punto della traiettorie nell'ista desi 
 	
@@ -525,11 +525,11 @@ int main(int argc, char **argv){
     			y_sup = coo_ee_fl(1);
 				//Controllo con capture point
 				//ottim_cp->CalcoloProbOttimoCP(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot,
-				 //m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl, x_inf, x_sup, y_inf, y_sup);
+				//m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl, x_inf, x_sup, y_inf, y_sup);
 				//vector<double> tau = ottim_cp->getTau();
 
 				//controllo sul capture point e traiettoria
-				w=sqrt(9.81/com_zdes);
+				
 				cpx = com_pos(0)+com_vel(0)/w;
 				cpy = com_pos(1)+com_vel(1)/w;
 				cout<<"cpx-main: "<<cpx<<endl;
@@ -549,6 +549,8 @@ int main(int argc, char **argv){
 				<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "
 				<<coo_ee_fr(0)<<" "<<coo_ee_fr(1)<<" "<<coo_ee_fr(2)<<" "<<"\n";
 				foothold_file.flush();
+				x_lim_file<<x_sup<<"\n";
+				x_lim_file.flush();
 				//pubblico i foothold
 				foothold.data.clear();
 				foothold.data.push_back(coo_ee_bl(0));
@@ -567,7 +569,7 @@ int main(int argc, char **argv){
 				_foothold_pub.publish(foothold);
 
 				
-
+				
 				x_lim.data.push_back(x_sup);
 				_x_lim_pub.publish(x_lim);
 
@@ -594,7 +596,8 @@ int main(int argc, char **argv){
       			Eigen::VectorXd tau;
       			tau.resize(12);
        			tau = doggoControl->Cntr(composdes, comveldes, comaccdes, Kcom, Dcom, 
-				   m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl);
+				   m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl,
+				   x_inf, x_sup, y_inf, y_sup);
 				
       			 std::cout<<"tau"<<tau<<std::endl;
 				// Set command message
@@ -625,7 +628,7 @@ int main(int argc, char **argv){
 
 				//Sending command
 					_tau_pub.publish(tau1_msg);
-
+				
 //-----------------------------------------------------
 			}
 				// One step in gazebo world ( to use if minqp problem takes too long for control loop)
@@ -638,14 +641,19 @@ int main(int argc, char **argv){
 		
 		
 	}
-/*
+
 	if(cpok==false)
 	{
 		//traiettoria 1
-					
-					double t_in=0.0, t_fin=0.2, t1;
+					doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+					MatrixXd com_pos=doggo->getCOMpos();
+					MatrixXd com_vel=doggo->getCOMvel();	
+					cpx = com_pos(0)+com_vel(0)/w;
+					cpy = com_pos(1)+com_vel(1)/w;
+					cout<<"cpx t1: "<<cpx<<endl;
+					double t_in=0.0, t_fin=0.1, t1;
 					ros::Time begin1 = ros::Time::now();
-					t1 = (ros::Time::now()-begin1).toSec();
+					
 					//traiettoria del centro di massa
 					Matrix<double,6,1> init_pos1, end_pos1, init_vel1, end_vel1, init_acc1, end_acc1;
 
@@ -674,7 +682,7 @@ int main(int argc, char **argv){
 					pos_ini<< 0,0,0,0,0,0;
 					
 					// Desired position
-					pos_fin<<(cpx+0.2-coo_ee_br(0))/2, 0, 0.5, 0,0,0;
+					pos_fin<<(cpx+0.2-coo_ee_br(0))/2, 0, 0.2, 0,0,0;
 				
 					
 
@@ -689,7 +697,8 @@ int main(int argc, char **argv){
 		 
 
 		while((ros::Time::now()-begin1).toSec() < t_fin-0.001)
-		{
+		{	
+			t1 = (ros::Time::now()-begin1).toSec();
 			int idx1= std::round( t1*1000);
 			doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 			//traiettoria per il centro di massa
@@ -708,8 +717,8 @@ int main(int argc, char **argv){
 					footveldes<<traj1.vel(0,idx1), traj1.vel(1,idx1), traj1.vel(2,idx1),MatrixXd::Zero(3,1);
 					footaccdes<<traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1),traj1.acc(0,idx1), traj1.acc(1,idx1), traj1.acc(2,idx1);
 					
-					MatrixXd com_pos = doggo->getCOMpos();
-					MatrixXd com_vel=doggo->getCOMvel();
+					com_pos = doggo->getCOMpos();
+					com_vel = doggo->getCOMvel();
 					//scrivo dati su file
 					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
 					com_file.flush();
@@ -725,9 +734,10 @@ int main(int argc, char **argv){
 					tempo_simulazione_file<<ts<<"\n";
 					tempo_simulazione_file.flush();
 
-					
 
 					
+
+					cout<<"c1"<<endl;
 					// control vector
 					Eigen::VectorXd tau_step;
 					tau_step.resize(12);
@@ -773,17 +783,25 @@ int main(int argc, char **argv){
 		}
 		
 					//-------------------------traiettoria 2 del com--------------------------
-					double t_in2=0.0, t_fin2=0.2, t2;
+					doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+					double t_in2=0.0, t_fin2=0.1, t2;
 					ros::Time begin2 = ros::Time::now();
-					t2 = (ros::Time::now()-begin2).toSec();
+					com_pos=doggo->getCOMpos();
+					com_vel=doggo->getCOMvel();
 					//traiettoria del centro di massa
 					Matrix<double,6,1> init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2;
 		
 					// Initial position
 					init_pos2= doggo->getCOMpos();
-					
+					cpx = com_pos(0)+com_vel(0)/w;
+					cpy = com_pos(1)+com_vel(1)/w;
+					cout<<"com_pos t2: "<<endl<<com_pos<<endl;
+					cout<<"com_vel t2: "<<endl<<com_vel<<endl;
+					cout<<"w t2: "<<w<<endl;
 					// Desired position
-					end_pos2<<(cpx+0.2-coo_ee_bl(0))/2, 0.0, 0.0, 0,0,0;
+					end_pos2<<((cpx+0.2)/2-coo_ee_bl(0)), 0.0, 0.0, 0,0,0;
+					
+					cout<<"cpx t2: "<<cpx<<endl;
 				
 					// Initial velocity
 					init_vel2= doggo->getCOMvel();
@@ -804,7 +822,7 @@ int main(int argc, char **argv){
 					pos_ini2<< 0,0,0,0,0,0;
 					
 					// Desired position
-					pos_fin2<<(cpx+0.2-coo_ee_br(0))/2, 0, 0.5, 0,0,0;
+					pos_fin2<<(cpx+0.2-coo_ee_br(0))/2, 0, 0, 0,0,0;//dopo rimetti 0.2 al terzo elemento
 				
 					
 
@@ -817,8 +835,10 @@ int main(int argc, char **argv){
 
 					
 			while((ros::Time::now()-begin2).toSec() < t_fin2-0.001)
-		{
+		{	
+			t2 = (ros::Time::now()-begin2).toSec();
 			int idx2= std::round( t2*1000);
+			
 			doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 			//traiettoria per il centro di massa
 			//Calcolo vettori desiderati prendo solo la posizione e non l'orientamento
@@ -839,8 +859,8 @@ int main(int argc, char **argv){
 
 
 					
-					MatrixXd com_pos = doggo->getCOMpos();
-					MatrixXd com_vel=doggo->getCOMvel();
+					com_pos = doggo->getCOMpos();
+					com_vel = doggo->getCOMvel();
 					//scrivo dati su file
 					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
 					com_file.flush();
@@ -856,7 +876,7 @@ int main(int argc, char **argv){
 					tempo_simulazione_file<<ts<<"\n";
 					tempo_simulazione_file.flush();
 
-					
+					cout<<"c2"<<endl;
 					// control vector
 					Eigen::VectorXd tau_step;
 					tau_step.resize(12);
@@ -899,7 +919,7 @@ int main(int argc, char **argv){
 						ros::spinOnce();
 		}
 	}
- */
+ 
  //pase gazebo call
  pauseGazebo.call(pauseSrv);
  	

@@ -910,18 +910,25 @@ Eigen::VectorXd QUADRUPED::qpproblem( Eigen::Matrix<double,6,1> &Wcom_des)
 
 // Quadratic problem with capture point
 Eigen::VectorXd QUADRUPED::qpproblem_cp( Eigen::Matrix<double,6,1> &Wcom_des, float &m_blfl, float &m_flfr, 
-float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl)
+float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl,
+float &x_inf, float &x_sup, float&y_inf, float &y_sup)
 {
 	Eigen::Matrix<double,6,1> com_pos = iDynTree::toEigen(CoM);
 	Eigen::Matrix<double,6,1> com_vel = iDynTree::toEigen(CoM_vel);
 	//eigenfrequency
 	w=sqrt(9.81/com_zdes);
-	 //termini noti del problema quadratico
+	/* //termini noti del problema quadratico
 	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_frbr +m_frbr * com_pos(0) +m_frbr * com_vel(0) * Dt  +m_frbr *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
 	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_blfl +m_blfl * com_pos(0) +m_blfl * com_vel(0) * Dt  +m_blfl *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
    	tnr = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_flfr +m_flfr * com_pos(0) +m_flfr * com_vel(0) * Dt  +m_flfr *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
 	tns = 2*w/(pow(Dt,2)*w + 2 * Dt) * (q_brbl +m_brbl * com_pos(0) +m_brbl * com_vel(0) * Dt  +m_brbl *com_pos(0)/w - com_pos(1) - com_vel(1) * Dt - com_vel(1)/w);
+	*/
+	//vincoli superiori e inferiori per il poligono di supporto 
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (x_sup  - com_pos(0) - com_vel(0) * Dt  -com_pos(0)/w);
+	tnn = 2*w/(pow(Dt,2)*w + 2 * Dt) * (x_inf  - com_pos(0) - com_vel(0) * Dt  -com_pos(0)/w);
 
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (y_inf  - com_pos(1) - com_vel(1) * Dt  -com_pos(1)/w);
+	tnp = 2*w/(pow(Dt,2)*w + 2 * Dt) * (y_sup  - com_pos(1) - com_vel(1) * Dt  -com_pos(1)/w);
 
 	// Set variables
    int variables=30;
@@ -1086,10 +1093,15 @@ float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float
 
 	eigenL<< eigenA,eigenb,
 	         eigenD, eigenC,
+			 1,0,Eigen::Matrix<double,1,28>::Zero(),tnp,
+			 1,0,Eigen::Matrix<double,1,28>::Zero(),tnn,
+			 0,1,Eigen::Matrix<double,1,28>::Zero(),tnr,
+			 0,1,Eigen::Matrix<double,1,28>::Zero(),tns;
+			 /* vincoli nel caso in cui i lati del poligono non siano paralleli agli assi del sistema mondo
 			 -m_frbr,1,Eigen::Matrix<double,1,28>::Zero(),tnp,
 			 -m_blfl,1,Eigen::Matrix<double,1,28>::Zero(),tnn,
 			 -m_flfr,1,Eigen::Matrix<double,1,28>::Zero(),tnr,
-			 -m_brbl,1,Eigen::Matrix<double,1,28>::Zero(),tns;
+			 -m_brbl,1,Eigen::Matrix<double,1,28>::Zero(),tns;*/
 
     
     
@@ -1601,10 +1613,12 @@ std::cout<<"a2"<<endl;
              c(i) = eigenc(i,j);
     }
 
-std::cout<<"a21"<<endl;
+/*std::cout<<"a21"<<endl;
+std::cout<<"T_s: "<<endl<<T_s<<endl;
+std::cout<<"Wcom_des: "<<endl<<Wcom_des<<endl;
 std::cout<<"eigenc: "<<endl<<eigenc<<endl;
 
-
+*/
 
     alglib::minqpstate state;
 	// Create QP optimizer
