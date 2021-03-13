@@ -51,7 +51,7 @@ Eigen::VectorXd QUADRUPEDController::Cntr(Eigen::Matrix<double,6,1> &CoMPosDes,
 
   tau=dogbot->qpproblem(Wcom_des);
   
-  //tau=dogbot->qpproblem_cp(Wcom_des,m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl);
+  //tau=dogbot->qpproblem_cp(Wcom_des,m_blfl, m_flfr, m_frbr, m_brbl, q_blfl, q_flfr, q_frbr, q_brbl,x_inf, x_sup, y_inf, y_sup);
   
   return tau;
 

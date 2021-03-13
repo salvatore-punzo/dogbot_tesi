@@ -1786,7 +1786,7 @@ std::cout<<"eigenc: "<<endl<<eigenc<<endl;
 	fext_lambda<<toEigen(JacCOM_lin).block(swl1,0,3,18)*(P*toEigen(MassMatrixCOM)+Eigen::Matrix<double,18,18>::Identity()-P).inverse()*P*toEigen(JacCOM_lin).transpose()*fext,
 	            toEigen(JacCOM_lin).block(swl2,0,3,18)*(P*toEigen(MassMatrixCOM)+Eigen::Matrix<double,18,18>::Identity()-P).inverse()*P*toEigen(JacCOM_lin).transpose()*fext;
 
-	  std::cout<<"fextl"<<fext_lambda<<std::endl;
+	  //std::cout<<"fextl"<<fext_lambda<<std::endl;
 
 	iDynTree::MatrixDynSize Jac1(6,18);
 	iDynTree::MatrixDynSize Jac2(6,18);
@@ -1794,11 +1794,11 @@ std::cout<<"eigenc: "<<endl<<eigenc<<endl;
 	toEigen(Jac1)=toEigen(Jac2)*toEigen(T).inverse();
 
 	
+	
+    //std::cout<<"fextl"<<toEigen(JacCOM_lin).block(0,0,12,6).transpose()*fext<<std::endl;
 
-     std::cout<<"fextl"<<toEigen(JacCOM_lin).block(0,0,12,6).transpose()*fext<<std::endl;
-
-	std::cout<<"fextl"<<(toEigen(Jac1).block(0,0,3,18)*toEigen(MassMatrixCOM).inverse()*P*toEigen(Jac1).block(0,0,3,18).transpose()).inverse()*toEigen(Jac1).block(0,0,3,18)*toEigen(MassMatrixCOM).inverse()*Si.transpose()*P*toEigen(JacCOM_lin).transpose()*fext<<std::endl;
-	// Eigen::Matrix<double,6,6> Lambdasw1=(toEigen(JacCOM_lin).block(0,0,3,18)*Mc.inverse()*P*toEigen(JacCOM_lin).block(0,0,3,18).transpose()).inverse();
+	//std::cout<<"fextl"<<(toEigen(Jac1).block(0,0,3,18)*toEigen(MassMatrixCOM).inverse()*P*toEigen(Jac1).block(0,0,3,18).transpose()).inverse()*toEigen(Jac1).block(0,0,3,18)*toEigen(MassMatrixCOM).inverse()*Si.transpose()*P*toEigen(JacCOM_lin).transpose()*fext<<std::endl;
+	//Eigen::Matrix<double,6,6> Lambdasw1=(toEigen(JacCOM_lin).block(0,0,3,18)*Mc.inverse()*P*toEigen(JacCOM_lin).block(0,0,3,18).transpose()).inverse();
 	Eigen::Matrix<double,6,1> vdotsw_lambda;
 	vdotsw_lambda<<vdotswdes.block(0,0,3,1),
 	               vdotswdes.block(3,0,3,1);
@@ -1883,7 +1883,7 @@ std::cout<<"eigenc: "<<endl<<eigenc<<endl;
 
 	// Solve qp
     alglib::minqpresults(state, x_, rep);
-std::cout<<"a6"<<endl;
+
 
    
 	for ( int j = 0; j < x_eigen.size(); j++ )
@@ -1895,9 +1895,9 @@ std::cout<<"a6"<<endl;
     
 	Eigen::VectorXd tau= Eigen::VectorXd::Zero(12);
 	tau=toEigen(MassMatrixCOM).block(6,6,12,12)*x_eigen.block(6,0,12,1)+eigenBiascom-Jstj.transpose()*x_eigen.block(18,0,6,1);
-	std::cout<<"acc"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*x_eigen.block(0,0,18,1)+toEigen(JdqdCOM_lin).block(swl1,0,3,1)<<std::endl;
-	std::cout<<"vel"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*toEigen(dq)<<std::endl;
+	//std::cout<<"acc"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*x_eigen.block(0,0,18,1)+toEigen(JdqdCOM_lin).block(swl1,0,3,1)<<std::endl;
+	//std::cout<<"vel"<<toEigen(JacCOM_lin).block(swl1,0,3,18)*toEigen(dq)<<std::endl;
 	return tau;
-std::cout<<"a7"<<endl;
+
 
 }

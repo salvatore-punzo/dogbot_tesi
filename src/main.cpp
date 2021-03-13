@@ -53,7 +53,7 @@ using namespace std;
 // Variabili globali
 
 bool joint_state_available = false, joint_base_available = false;
-
+bool contact_fr, contact_fl, contact_br, contact_bl;
 VectorXd hp(4), kp(4), he(4), rp(4);
 Vector3d eef_bl, eef_br, eef_fl, eef_fr;
 Vector3d coo_ee_bl, coo_ee_br, coo_ee_fl, coo_ee_fr;
@@ -116,8 +116,10 @@ void Joint_cb(sensor_msgs::JointStateConstPtr js){
 void eebl_cb(gazebo_msgs::ContactsStateConstPtr eebl){
 
 	if(eebl->states.empty()){ 
+		contact_bl = false;
 	}
 	else{
+		contact_bl = true;
 		eef_bl<<eebl->states[0].total_wrench.force.x,
 		eebl->states[0].total_wrench.force.y, eebl->states[0].total_wrench.force.z;
 
@@ -128,8 +130,10 @@ void eebl_cb(gazebo_msgs::ContactsStateConstPtr eebl){
 void eebr_cb(gazebo_msgs::ContactsStateConstPtr eebr){
 
 	if(eebr->states.empty()){
+		contact_br = false;
 	}
 	else{
+		contact_br = true;
 		eef_br<<eebr->states[0].total_wrench.force.x,
 		eebr->states[0].total_wrench.force.y, eebr->states[0].total_wrench.force.z;
 
@@ -139,8 +143,10 @@ void eebr_cb(gazebo_msgs::ContactsStateConstPtr eebr){
 //posizione del contatto e misura della forza
 void eefl_cb(gazebo_msgs::ContactsStateConstPtr eefl){
 	if(eefl->states.empty()){
+		contact_fl = false;
 	}
 	else{
+		contact_fl = true;
 		eef_fl<<eefl->states[0].total_wrench.force.x,
 		eefl->states[0].total_wrench.force.y, eefl->states[0].total_wrench.force.z;
 
@@ -150,8 +156,10 @@ void eefl_cb(gazebo_msgs::ContactsStateConstPtr eefl){
 //posizione del contatto e misura della forza
 void eefr_cb(gazebo_msgs::ContactsStateConstPtr eefr){
 	if(eefr->states.empty()){
+		contact_fr = false;
 	}
 	else{
+		contact_fr = true;
 		eef_fr<<eefr->states[0].total_wrench.force.x,
 		eefr->states[0].total_wrench.force.y, eefr->states[0].total_wrench.force.z;
 
@@ -217,6 +225,7 @@ int main(int argc, char **argv){
 	string modelFile="/home/salvatore/ros_ws/src/DogBotV4/ROS/src/dogbot_description/urdf/dogbot.urdf";
 	std::ofstream com_file("com_file.txt");
 	std::ofstream foothold_file("foothold.txt");
+	std::ofstream foothold_des_file("foothold_des.txt");
 	std::ofstream capture_point_file("capture_point.txt");
 	std::ofstream tempo_simulazione_file("tempo_simulazione.txt");
 	std::ofstream com_traiettoria_des_file("com_traiettoria_des.txt");
@@ -305,7 +314,7 @@ int main(int argc, char **argv){
 		std_msgs::Float64MultiArray foothold;
 		geometry_msgs::Point capture_p;
 		std_msgs::Float64MultiArray x_lim;
-
+	
 	    // Start the robot in position (stand up) 
       gazebo_msgs::SetModelConfiguration robot_init_config;
       robot_init_config.request.model_name = "dogbot";
@@ -349,12 +358,13 @@ int main(int argc, char **argv){
       robot_init_state.request.model_state.pose.orientation.y=0.0;
       robot_init_state.request.model_state.pose.orientation.z=0.0;
       robot_init_state.request.model_state.pose.orientation.w=0.0;
+	
       if(set_model_state_srv.call(robot_init_state))
         ROS_INFO("Robot state set.");
       else
         ROS_INFO("Failed to set robot state.");
 
-	   
+	  
 	   
 	   std_srvs::Empty pauseSrv;
 		 
@@ -641,8 +651,9 @@ int main(int argc, char **argv){
 		
 		
 	}
-
-	if(cpok==false)
+	
+	
+	if(cpok==false)//memo rimetti la condizione uguale a false 
 	{
 		//traiettoria 1
 					doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
@@ -650,8 +661,8 @@ int main(int argc, char **argv){
 					MatrixXd com_vel=doggo->getCOMvel();	
 					cpx = com_pos(0)+com_vel(0)/w;
 					cpy = com_pos(1)+com_vel(1)/w;
-					cout<<"cpx t1: "<<cpx<<endl;
-					double t_in=0.0, t_fin=0.1, t1;
+					
+					double t_in=0.0, t_fin=0.07, t1;
 					ros::Time begin1 = ros::Time::now();
 					
 					//traiettoria del centro di massa
@@ -661,7 +672,7 @@ int main(int argc, char **argv){
 					init_pos1= doggo->getCOMpos();
 					
 					// Desired position
-					end_pos1<<((cpx+0.2)/2-coo_ee_bl(0))/2, 0.0, 0.0, 0,0,0;
+					end_pos1<<(cpx+0.002-coo_ee_br(0))/4, 0.0, 0.0, 0,0,0; //((cpx+0.01)/2-coo_ee_bl(0))/2
 				
 					// Initial velocity
 					init_vel1= doggo->getCOMvel();
@@ -682,7 +693,7 @@ int main(int argc, char **argv){
 					pos_ini<< 0,0,0,0,0,0;
 					
 					// Desired position
-					pos_fin<<(cpx+0.2-coo_ee_br(0))/2, 0, 0.2, 0,0,0;
+					pos_fin<<(cpx+0.002-coo_ee_br(0))/2, 0, 0.2, 0,0,0; //(cpx+0.01-coo_ee_br(0))/2
 				
 					
 
@@ -722,10 +733,12 @@ int main(int argc, char **argv){
 					//scrivo dati su file
 					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
 					com_file.flush();
-					cpx = com_pos(0)+com_vel(0)/w;
-					cpy = com_pos(1)+com_vel(1)/w;
+					//cpx = com_pos(0)+com_vel(0)/w;
+					//cpy = com_pos(1)+com_vel(1)/w;
 					capture_point_file<<cpx<<" "<<cpy<<"\n";
 					capture_point_file.flush();
+					foothold_des_file<<footposdes(0)<<" "<<footposdes(1)<<" "<<footposdes(2)<<" "<<"\n";
+					foothold_des_file.flush();
 					foothold_file<<coo_ee_bl(0)<<" "<<coo_ee_bl(1)<<" "<<coo_ee_bl(2)<<" "<<coo_ee_br(0)<<" "
 					<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "
 					<<coo_ee_fr(0)<<" "<<coo_ee_fr(1)<<" "<<coo_ee_fr(2)<<" "<<"\n";
@@ -737,7 +750,7 @@ int main(int argc, char **argv){
 
 					
 
-					cout<<"c1"<<endl;
+					
 					// control vector
 					Eigen::VectorXd tau_step;
 					tau_step.resize(12);
@@ -784,7 +797,7 @@ int main(int argc, char **argv){
 		
 					//-------------------------traiettoria 2 del com--------------------------
 					doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
-					double t_in2=0.0, t_fin2=0.1, t2;
+					double t_in2=0.0, t_fin2=0.07, t2;
 					ros::Time begin2 = ros::Time::now();
 					com_pos=doggo->getCOMpos();
 					com_vel=doggo->getCOMvel();
@@ -795,11 +808,12 @@ int main(int argc, char **argv){
 					init_pos2= doggo->getCOMpos();
 					cpx = com_pos(0)+com_vel(0)/w;
 					cpy = com_pos(1)+com_vel(1)/w;
+					
 					cout<<"com_pos t2: "<<endl<<com_pos<<endl;
 					cout<<"com_vel t2: "<<endl<<com_vel<<endl;
 					cout<<"w t2: "<<w<<endl;
 					// Desired position
-					end_pos2<<((cpx+0.2)/2-coo_ee_bl(0)), 0.0, 0.0, 0,0,0;
+					end_pos2<<(cpx+0.002-coo_ee_br(0))/4, 0.0, 0.0, 0,0,0;//((0.01)/2-coo_ee_bl(0))/2 deve essere lo stesso cpx di prima
 					
 					cout<<"cpx t2: "<<cpx<<endl;
 				
@@ -822,7 +836,7 @@ int main(int argc, char **argv){
 					pos_ini2<< 0,0,0,0,0,0;
 					
 					// Desired position
-					pos_fin2<<(cpx+0.2-coo_ee_br(0))/2, 0, 0, 0,0,0;//dopo rimetti 0.2 al terzo elemento
+					pos_fin2<<(cpx+0.002-coo_ee_br(0))/2, 0, -0.0, 0,0,0;//dopo rimetti 0.2 al terzo elemento mentre al I termine metti (cpx+0.01-coo_ee_br(0))/2
 				
 					
 
@@ -834,7 +848,7 @@ int main(int argc, char **argv){
 
 
 					
-			while((ros::Time::now()-begin2).toSec() < t_fin2-0.001)
+			while((ros::Time::now()-begin2).toSec() < t_fin2-0.001 && (!contact_fr && !contact_br))
 		{	
 			t2 = (ros::Time::now()-begin2).toSec();
 			int idx2= std::round( t2*1000);
@@ -864,10 +878,12 @@ int main(int argc, char **argv){
 					//scrivo dati su file
 					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
 					com_file.flush();
-					cpx = com_pos(0)+com_vel(0)/w;
-					cpy = com_pos(1)+com_vel(1)/w;
+					//cpx = com_pos(0)+com_vel(0)/w;
+					//cpy = com_pos(1)+com_vel(1)/w;
 					capture_point_file<<cpx<<" "<<cpy<<"\n";
 					capture_point_file.flush();
+					foothold_des_file<<footposdes(0)<<" "<<footposdes(1)<<" "<<footposdes(2)<<" "<<"\n";
+					foothold_des_file.flush();
 					foothold_file<<coo_ee_bl(0)<<" "<<coo_ee_bl(1)<<" "<<coo_ee_bl(2)<<" "<<coo_ee_br(0)<<" "
 					<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "
 					<<coo_ee_fr(0)<<" "<<coo_ee_fr(1)<<" "<<coo_ee_fr(2)<<" "<<"\n";
@@ -876,7 +892,7 @@ int main(int argc, char **argv){
 					tempo_simulazione_file<<ts<<"\n";
 					tempo_simulazione_file.flush();
 
-					cout<<"c2"<<endl;
+					
 					// control vector
 					Eigen::VectorXd tau_step;
 					tau_step.resize(12);
