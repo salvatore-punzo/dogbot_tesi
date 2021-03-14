@@ -42,6 +42,7 @@
 #include "prob_quadratico_cp.h"
 #include "quadruped_control.h"
 #include "quadruped_step.h"
+//#include "eseguo_traj.h"
 
 #include <fstream>
 #include <sstream>
@@ -252,6 +253,9 @@ int main(int argc, char **argv){
 
 	CAPTURE_POINT *cp;
 	cp = new CAPTURE_POINT;
+
+	//ESEGUOtraj *controllo_traj;
+	//controllo_traj = new ESEGUOtraj(*doggo);
 	
 	// Set controller Viviana
     QUADRUPEDController *doggoControl; //controller_(doggo);
@@ -421,7 +425,7 @@ int main(int argc, char **argv){
 	 ts = ros::Time::now();
      ROS_INFO_STREAM_ONCE("Starting control loop ...");
 	bool cpok = true; 
-	  while ((ros::Time::now()-begin).toSec() < tf-0.001 && cpok)
+	  while ((ros::Time::now()-begin).toSec() < tf-0.001 && cpok) //dopo rimetti cpok senza !
     { 
 		//prendo punto della traiettorie nell'ista desi 
 	
@@ -639,7 +643,7 @@ int main(int argc, char **argv){
 				//Sending command
 					_tau_pub.publish(tau1_msg);
 				
-//-----------------------------------------------------
+				//-----------------------------------------------------
 			}
 				// One step in gazebo world ( to use if minqp problem takes too long for control loop)
 				pub->Publish(stepper);
@@ -878,8 +882,8 @@ int main(int argc, char **argv){
 					//scrivo dati su file
 					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
 					com_file.flush();
-					//cpx = com_pos(0)+com_vel(0)/w;
-					//cpy = com_pos(1)+com_vel(1)/w;
+					cpx = com_pos(0)+com_vel(0)/w;
+					cpy = com_pos(1)+com_vel(1)/w;
 					capture_point_file<<cpx<<" "<<cpy<<"\n";
 					capture_point_file.flush();
 					foothold_des_file<<footposdes(0)<<" "<<footposdes(1)<<" "<<footposdes(2)<<" "<<"\n";
@@ -934,7 +938,146 @@ int main(int argc, char **argv){
 				
 						ros::spinOnce();
 		}
+
+		
 	}
+
+	//traiettoria per riportare il dogbot nella condizione iniziale
+		doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+	
+		//traiettoria
+		double ti3=0.0, tf3=1.5, t3=0.0;
+		
+		Matrix<double,6,1> init_pos3, end_pos3, init_vel3, end_vel3, init_acc3, end_acc3;
+
+		// Initial position
+		init_pos3= doggo->getCOMpos();
+		
+		// Desired position
+		end_pos3<<0.0, -0.0, 0.4,0,0,0;
+	
+		// Initial velocity
+		init_vel3= doggo->getCOMvel();
+		
+
+		end_vel3 = Matrix<double,6,1>::Zero();
+		end_vel3 = init_acc3 = end_acc3;
+
+		traiettoria = new TrajPlanner(ti3, tf3, init_pos3, end_pos3, init_vel3, end_vel3, init_acc3, end_acc3);
+		
+		trajectory_point traj_com3;
+		traj_com3 = traiettoria->getTraj();
+		
+		
+
+			// initial simulation time 
+		ros::Time begin3 = ros::Time::now();
+		while ((ros::Time::now()-begin3).toSec() < tf3-0.001)// && cpok)
+    	{ 
+			t3 = (ros::Time::now()-begin3).toSec();
+			int idx3= std::round( t3*1000);
+				
+			doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+			VectorXd b=doggo->getBiasMatrix();
+				Matrix<double,18,18> M=doggo->getMassMatrix();
+				Matrix<double,24,18> Jc=doggo->getJacobian();
+				Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
+				Matrix<double,18,18> T=doggo->getTransMatrix();
+				Matrix<double,18,18> T_dot=doggo->getTdotMatrix();
+			    Matrix<double,6,18> Jcom=doggo->getJCOMMatrix();				
+                Matrix<double,6,18> Jcomdot=doggo->getJCOMDot();				
+				MatrixXd com_pos=doggo->getCOMpos();				
+                MatrixXd com_vel=doggo->getCOMvel();
+				
+			//traiettoria per il centro di massa
+			//Calcolo vettori desiderati prendo solo la posizione e non l'orientamento
+			Matrix<double,6,1> composdes, comveldes, comaccdes;
+					composdes<<traj_com3.pos(0,idx3), traj_com3.pos(1,idx3), traj_com3.pos(2,idx3),MatrixXd::Zero(3,1);
+					comveldes<<traj_com3.vel(0,idx3), traj_com3.vel(1,idx3), traj_com3.vel(2,idx3),MatrixXd::Zero(3,1);
+					comaccdes<<traj_com3.acc(0,idx3), traj_com3.acc(1,idx3), traj_com3.acc(2,idx3),MatrixXd::Zero(3,1);
+					
+					com_pos = doggo->getCOMpos();
+					com_vel = doggo->getCOMvel();
+					//scrivo dati su file
+					com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
+					com_file.flush();
+					cpx = com_pos(0)+com_vel(0)/w;
+					cpy = com_pos(1)+com_vel(1)/w;
+					capture_point_file<<cpx<<" "<<cpy<<"\n";
+					capture_point_file.flush();
+					com_traiettoria_des_file<<composdes(0)<<" "<<composdes(1)<<" "<<composdes(2)<<" "<<composdes(3)<<" "<<composdes(4)<<" "<<composdes(5)<<"\n";
+					com_traiettoria_des_file.flush();
+					foothold_file<<coo_ee_bl(0)<<" "<<coo_ee_bl(1)<<" "<<coo_ee_bl(2)<<" "<<coo_ee_br(0)<<" "
+					<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "
+					<<coo_ee_fr(0)<<" "<<coo_ee_fr(1)<<" "<<coo_ee_fr(2)<<" "<<"\n";
+					foothold_file.flush();
+					ts = ros::Time::now();
+					tempo_simulazione_file<<ts<<"\n";
+					tempo_simulazione_file.flush();
+			
+			//controllo senza capture point
+			ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
+			vector<double> tau = ottim->getTau();
+			msg_ctrl.data.clear();
+			
+			//stampa tau e controlla anche il topic command
+			for(int i =0; i<12; i++){
+					cout<<"tau: "<<tau[11-i]<<endl;
+					tau_file<<tau[11-i]<<" ";
+					msg_ctrl.data.push_back(tau[i]);
+			}
+			tau_file<<"\n";
+			tau_file.flush();
+			_tau_pub.publish(msg_ctrl);
+			
+				/*// Compute control torque Viv
+				// control vector
+      			Eigen::VectorXd tau;
+      			tau.resize(12);
+       			tau = doggoControl->Cntr1(composdes, comveldes, comaccdes, Kcom, Dcom);
+				
+      			 std::cout<<"tau3"<<tau<<std::endl;
+				// Set command message
+				tau1_msg.data.clear();
+				std::vector<double> ta(12,0.0);
+
+				// torques in right order
+				ta[11]=tau(7);
+				ta[10]=tau(6);
+				ta[9]=tau(2);
+				ta[8]=tau(5);
+				ta[7]=tau(4);
+				ta[6]=tau(3);
+				ta[5]=tau(9);
+				ta[4]=tau(8);
+				ta[3]=tau(1);
+				ta[2]=tau(11);
+				ta[1]=tau(10);
+				ta[0]=tau(0);
+				
+
+				// Fill Command message
+				for(int i=0; i<12; i++)
+				{
+			
+					tau1_msg.data.push_back(ta[i]);
+				}
+
+				//Sending command
+					_tau_pub.publish(tau1_msg);
+				
+				
+				*/
+
+
+				// One step in gazebo world ( to use if minqp problem takes too long for control loop)
+				pub->Publish(stepper);
+				
+				ros::spinOnce();
+				
+				loop_rate.sleep();
+		
+		}
  
  //pase gazebo call
  pauseGazebo.call(pauseSrv);
