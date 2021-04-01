@@ -62,6 +62,24 @@ class QUADRUPED
   double getMass();
   int getDoFsnumber();
 
+  Eigen::MatrixXd getBRpos();
+  Eigen::MatrixXd getBLpos();
+  Eigen::MatrixXd getFLpos();
+  Eigen::MatrixXd getFRpos();
+  Eigen::MatrixXd getBRvel();
+  Eigen::MatrixXd getBLvel();
+  Eigen::MatrixXd getFLvel();
+  Eigen::MatrixXd getFRvel();
+  Eigen::MatrixXd getfest();
+  Eigen::Matrix<double,3,3> getBRworldtransform();
+  Eigen::Matrix<double,3,3> getBLworldtransform();
+  Eigen::Matrix<double,3,3> getFLworldtransform();
+  Eigen::Matrix<double,3,3> getFRworldtransform();
+  Eigen::Matrix<double,3,1> getbrlowerleg();
+  Eigen::MatrixXd getCtq();
+  Eigen::MatrixXd getsolution();
+  
+
   private:
 
   double tnp,tnn, tnr, tns;
@@ -156,6 +174,11 @@ class QUADRUPED
 
   // Transformation matrix time derivative
   iDynTree::MatrixDynSize T_dot;
+
+  
+   Eigen::Matrix<double,3,1> fest;
+
+   Eigen::Matrix<double,18,1> Ctq;
   
   //Model
   iDynTree::Model model;

@@ -2,7 +2,7 @@
 
 ESEGUOtraj::ESEGUOtraj()
 {
-
+	
 }
 
 ESEGUOtraj::ESEGUOtraj(QUADRUPED &quadruped_)
@@ -12,17 +12,22 @@ ESEGUOtraj::ESEGUOtraj(QUADRUPED &quadruped_)
   
 }
 
-vector<double> ESEGUOtraj::eseguo_traj(ros::Time begin3, double tf3, double t3)
-{
+ESEGUOtraj::ESEGUOtraj(PROB_QUAD){
+	
+}
 
-    while ((ros::Time::now()-begin3).toSec() < tf3-0.001)// && cpok)
-    { 
-		t3 = (ros::Time::now()-begin3).toSec();
-		int idx3= std::round( t3*1000);
-				
-		doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+
+vector<double> ESEGUOtraj::eseguo_traj(int idx3,Matrix<double, 18,1> q_joints_total, 
+Matrix<double, 18,1> dq_joints_total, trajectory_point traj_com3)
+{	
+	
+		
+		cout<<"wow1"<<endl;	
+		//doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+		cout<<"wow1.1.1"<<endl;
 		VectorXd b=doggo->getBiasMatrix();
 		Matrix<double,18,18> M=doggo->getMassMatrix();
+		cout<<"wow1.1"<<endl;
 		Matrix<double,24,18> Jc=doggo->getJacobian();
 		Matrix<double,24,1> Jcdqd=doggo->getBiasAcc();
 		Matrix<double,18,18> T=doggo->getTransMatrix();
@@ -31,7 +36,7 @@ vector<double> ESEGUOtraj::eseguo_traj(ros::Time begin3, double tf3, double t3)
         Matrix<double,6,18> Jcomdot=doggo->getJCOMDot();				
 		MatrixXd com_pos=doggo->getCOMpos();				
         MatrixXd com_vel=doggo->getCOMvel();
-				
+		cout<<"wow1.2"<<endl;
 		//traiettoria per il centro di massa
 		//Calcolo vettori desiderati prendo solo la posizione e non l'orientamento
 		Matrix<double,6,1> composdes, comveldes, comaccdes;
@@ -41,8 +46,8 @@ vector<double> ESEGUOtraj::eseguo_traj(ros::Time begin3, double tf3, double t3)
 					
 		com_pos = doggo->getCOMpos();
 		com_vel = doggo->getCOMvel();
-
-		//scrivo dati su file
+		cout<<"wow2"<<endl;
+		/*//scrivo dati su file
 		com_file<<com_pos(0)<<" "<<com_pos(1)<<" "<<com_pos(2)<<" "<<com_pos(3)<<" "<<com_pos(4)<<" "<<com_pos(5)<<"\n";
 		com_file.flush();
 		cpx = com_pos(0)+com_vel(0)/w;
@@ -58,11 +63,14 @@ vector<double> ESEGUOtraj::eseguo_traj(ros::Time begin3, double tf3, double t3)
 		ts = ros::Time::now();
 		tempo_simulazione_file<<ts<<"\n";
 		tempo_simulazione_file.flush();
-
+		*/
         //controllo senza capture point
 			ottim->CalcoloProbOttimo(b, M, Jc, Jcdqd, T, T_dot, q_joints_total, dq_joints_total, composdes, comveldes, com_pos, com_vel, Jcom, Jcomdot);
+			cout<<"wow21"<<endl;
 			vector<double> tau = ottim->getTau();
+			cout<<"wow3"<<endl;
+			return tau;
 			
-		return tau;
-    }
+		
+    
 }

@@ -658,7 +658,125 @@ Eigen::MatrixXd QUADRUPED::getMassMatrixCOM_joints()
 {
    
 	return toEigen(MassMatrixCOM).block(6,6,n,n);
+
+	
 }
+Eigen::MatrixXd QUADRUPED::getCtq()
+{
+	
+	return Ctq;
+
+}
+Eigen::MatrixXd QUADRUPED::getsolution()
+{
+   
+	return x_eigen;
+}
+//---------------nuove getfunction-----------------------
+Eigen::Matrix<double,3,3> QUADRUPED::getBRworldtransform()
+{    
+	
+	iDynTree::Transform  World_br;
+    World_br=kinDynComp.getWorldTransform(8);
+    return toEigen(World_br.getRotation());
+}
+
+Eigen::Matrix<double,3,3> QUADRUPED::getBLworldtransform()
+{   iDynTree::Transform  World_br;
+    World_br=kinDynComp.getWorldTransform(11);
+
+   return toEigen(World_br.getRotation());
+}
+
+Eigen::Matrix<double,3,3> QUADRUPED::getFLworldtransform()
+{   iDynTree::Transform  World_br;
+    World_br=kinDynComp.getWorldTransform(14);
+
+ return toEigen(World_br.getRotation());
+}
+
+Eigen::Matrix<double,3,3> QUADRUPED::getFRworldtransform()
+{   iDynTree::Transform  World_br;
+    World_br=kinDynComp.getWorldTransform(17);
+
+   return toEigen(World_br.getRotation());
+}
+
+Eigen::Matrix<double,3,1> QUADRUPED::getbrlowerleg()
+{   iDynTree::Transform  World_br;
+    World_br=kinDynComp.getRelativeTransform(7,8);
+
+   return toEigen(World_br.getPosition());
+}
+
+
+Eigen::MatrixXd QUADRUPED::getBRpos()
+{
+	iDynTree::Transform  World_br;
+    World_br=kinDynComp.getWorldTransform(8);
+	return toEigen(World_br.getPosition());
+
+}
+
+Eigen::MatrixXd QUADRUPED::getBLpos()
+{
+	iDynTree::Transform  World_bl;
+    World_bl=kinDynComp.getWorldTransform(11);
+	return toEigen(World_bl.getPosition());
+
+}
+
+Eigen::MatrixXd QUADRUPED::getFLpos()
+{
+	iDynTree::Transform  World_fl;
+    World_fl=kinDynComp.getWorldTransform(14);
+	return toEigen(World_fl.getPosition());
+
+}
+
+Eigen::MatrixXd QUADRUPED::getFRpos()
+{
+	iDynTree::Transform  World_fr;
+    World_fr=kinDynComp.getWorldTransform(17);
+	return toEigen(World_fr.getPosition());
+
+}
+
+Eigen::MatrixXd QUADRUPED::getBRvel()
+{   iDynTree::Twist br_vel;
+	br_vel=kinDynComp.getFrameVel(8);
+
+	return toEigen(br_vel.getLinearVec3() );
+
+}
+
+Eigen::MatrixXd QUADRUPED::getBLvel()
+{
+	iDynTree::Twist br_vel;
+	br_vel=kinDynComp.getFrameVel(11);
+
+	return toEigen(br_vel.getLinearVec3() );
+
+}
+
+Eigen::MatrixXd QUADRUPED::getFLvel()
+{
+iDynTree::Twist br_vel;
+	br_vel=kinDynComp.getFrameVel(14);
+
+	return toEigen(br_vel.getLinearVec3() );
+
+}
+
+Eigen::MatrixXd QUADRUPED::getFRvel()
+{
+	iDynTree::Twist br_vel;
+	br_vel=kinDynComp.getFrameVel(17);
+
+	return toEigen(br_vel.getLinearVec3() );
+
+}
+
 
 
 // Quadratic problem
@@ -1531,6 +1649,7 @@ Eigen::VectorXd QUADRUPED::qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes,  SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> fext)
 {
 	int swl1, swl2, stl1, stl2;
+	/*
     switch(swinglegs){
 		case L1: swl1=0;
 		swl2=0; 
@@ -1548,7 +1667,25 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 		stl2=9; 
 		 break;
 	}
-std::cout<<"a"<<endl;
+	*/
+	  switch(swinglegs){
+		case L1: swl1=0;
+		swl2=0; 
+		stl1=0;//0 indica br; 3 bl; 6->fl; 9->fr
+		stl2=0; 
+		break;
+		case L2: swl1=0;
+		swl2=6 ;
+		stl1=3;
+		stl2=9; 
+		 break;
+		case L3: swl1=3;
+		swl2=9;
+		stl1=0;
+		stl2=6; 
+		 break;
+	}
+
 	// Set variables
    int variables=30;
    alglib::real_2d_array Q, R, L;

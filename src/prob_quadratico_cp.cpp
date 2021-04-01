@@ -8,7 +8,6 @@ PROB_QUAD_CP::PROB_QUAD_CP(){
 
 void PROB_QUAD_CP::CalcoloProbOttimoCP(VectorXd &b, Matrix<double,18,18> &M, Matrix<double,24,18> &Jc, Matrix<double,24,1> &Jcdqd, Matrix<double,18,18> &T, Matrix<double,18,18> &T_dot,Matrix<double, 18,1> &q_joints_total, Matrix<double, 18,1> &dq_joints_total, 
 Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos, MatrixXd &com_vel,  Eigen::Matrix<double,6,18> Jt1, Eigen::Matrix<double,6,18> Jcomdot,
-float &m_blfl, float &m_flfr, float &m_frbr, float &m_brbl, float &q_blfl, float &q_flfr, float &q_frbr, float &q_brbl,
 float &x_inf, float &x_sup, float&y_inf, float &y_sup)
 {
 	//eigenfrequency
@@ -167,12 +166,13 @@ float &x_inf, float &x_sup, float&y_inf, float &y_sup)
 	//vincoli del problema quadratico 
 	Matrix<double,102,43> A;
      
-	//controlla i segni di kp e kd, controlla i segni della matrice A, verifica Jt1
+	/*//controlla i segni di kp e kd, controlla i segni della matrice A, verifica Jt1
 	Matrix<double,1,6>cps1,cps2,cps3,cps4;
 	cps1<<-m_frbr,1,0,0,0,0;
 	cps2<<-m_blfl,1,0,0,0,0;
 	cps3<<-m_flfr,1,0,0,0,0;
 	cps4<<-m_brbl,1,0,0,0,0;
+	*/
 
 	A<< M,-Jc_T_B,-S_T, -b,
 		B_T_Jc, Matrix<double,12,24>::Zero(),-B.transpose()*Jcdqd,

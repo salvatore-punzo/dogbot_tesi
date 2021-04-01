@@ -22,6 +22,7 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 
 	Jt1_dot_dq<<Jcomdot * dq_joints_total;
 
+
 	//Sn è la matrice che seleziona le componenti sull'asse z delle forze di contatto
 	Sn<<0,0,1,Matrix<double,1,9>::Zero(),
 		Matrix<double,1,5>::Zero(),1,Matrix<double,1,6>::Zero(),
@@ -39,13 +40,19 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 		zero,zero,zero,zero,
 		zero,zero,zero,I,
 		zero,zero,zero,zero;
+		
 
     S << MatrixXd::Zero(12,6), MatrixXd::Identity(12,12);
 	S_T = S.transpose();
+		
+
     Jc_T_B = Jc.transpose() * B;
+		
+
 	B_T_Jc = B.transpose() * Jc;
 
-    
+    	
+
 	// errore
     e<<com_pos - composdes;//posizione corrente - posizione desiderata
 		
@@ -60,7 +67,8 @@ Matrix<double,6,1> &composdes, Matrix<double,6,1> &comveldes,  MatrixXd &com_pos
 	Eigen::Matrix<double,6,6> eigenQ= Eigen::Matrix<double,6,6>::Identity();    //cout<<"wow"<<endl;
     Eigen::Matrix<double,42,42> eigenQ1=  matrixA.transpose()*eigenQ* matrixA;
 
-    
+    	
+
     //imposto il problema quadratico
 	/*Matrix<double,43,43> aa;
 	aa<<Matrix<double,43,43>::Identity();
@@ -243,6 +251,7 @@ for(int i = 6;i<18;i++){
 	real_1d_array x;
 	minqpstate state;
     minqpreport rep;
+	
 
 	 // NOTE: for convex problems you may try using minqpsetscaleautodiag()
     //       which automatically determines variable scales.

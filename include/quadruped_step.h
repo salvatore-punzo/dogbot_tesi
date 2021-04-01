@@ -40,6 +40,20 @@ class QUADRUPEDStep
                  Eigen::MatrixXd &Dcom,
                  Eigen::Matrix<double,6,1> footaccdes);
 
+        Eigen::VectorXd CntrBr(iDynTree::Vector6 &CoMPosDes,
+                 iDynTree::Vector6 &CoMVelDes,
+                 iDynTree::Vector6 &CoMAccDes,
+                 Eigen::MatrixXd &Kcom,
+                 Eigen::MatrixXd &Dcom, Eigen::VectorXd vdotswdes, QUADRUPED::SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> fext);       
+
+        Eigen::VectorXd CntrOl(iDynTree::Vector6 &CoMPosDes,
+                            iDynTree::Vector6 &CoMVelDes,
+                            iDynTree::Vector6 &CoMAccDes,
+                            Eigen::MatrixXd &Kcom,
+                            Eigen::MatrixXd &Dcom,
+                            Eigen::VectorXd vdotswdes,
+                            QUADRUPED::SWING_LEG swingleg, Eigen::Matrix<double,12,1> fext
+                            );
     private:
         QUADRUPED* dogbot;
 
