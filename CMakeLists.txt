@@ -153,6 +153,7 @@ src/poligono_supporto.cpp
 src/quadruped.cpp
 src/prob_quadratico.cpp
 src/traj_planner.cpp
+src/traj_planner_sw.cpp
 src/capture_point.cpp
 src/prob_quadratico_cp.cpp
 src/quadruped_control.cpp
@@ -229,6 +230,7 @@ src/poligono_supporto.cpp
 src/quadruped.cpp
 src/prob_quadratico.cpp
 src/traj_planner.cpp
+src/traj_planner_sw.cpp
 src/capture_point.cpp
 src/prob_quadratico_cp.cpp
 src/quadruped_control.cpp

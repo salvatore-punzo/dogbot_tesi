@@ -406,9 +406,11 @@ void swing_phase( ros::Rate loop_rate, double duration , double duration_prev)
 
 void swing_phasebr( ros::Rate loop_rate, double duration , double duration_prev)
 {
-	while ((ros::Time::now()-begin0).toSec() < duration &  contact_br == false)
+	cout<<"tempo corrente: "<<ros::Time::now()-begin0<<endl;
+	cout<<"Duration: "<<duration<<endl;
+	while ((ros::Time::now()-begin0).toSec() < duration)// &  contact_br == false)
     { 	 
-
+		
       if (joint_state_available && joint_base_available)
       	{  
 			// Update robot
@@ -423,7 +425,7 @@ void swing_phasebr( ros::Rate loop_rate, double duration , double duration_prev)
 			// Set desired vectors
 			iDynTree::Vector6 composdes, comveldes, comaccdes;
 		
-			
+			cout<<"prova"<<endl;
 			toEigen(composdes)<<solution.base_linear_->GetPoint(t).p(), solution.base_angular_->GetPoint(t).p();
 			toEigen(comveldes)<<solution.base_linear_->GetPoint(t).v(), solution.base_angular_->GetPoint(t).v();
 			toEigen(comaccdes) <<solution.base_linear_->GetPoint(t).a(), solution.base_angular_->GetPoint(t).a();
@@ -435,20 +437,24 @@ void swing_phasebr( ros::Rate loop_rate, double duration , double duration_prev)
 			std::cout<<"veldesbr"<<solution.ee_motion_.at(1)->GetPoint(t).v()<<std::endl;
 			std::cout<<"accdesbr"<<solution.ee_motion_.at(2)->GetPoint(t).v()<<std::endl;
 			std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;
+			
+			
+			cout<<"solution.ee_motion.at(1):"<<endl<<solution.ee_motion_.at(1)<<endl;
 			Eigen::Matrix<double,3,1> accd;
-			accd<< solution.ee_motion_.at(1)->GetPoint(t).a();
-
+			cout<<"accd: "<<endl<<solution.ee_motion_.at(1)->GetPoint(t).a();
+			accd<< solution.ee_motion_.at(1)->GetPoint(t).a(); //eigen error 
+			cout<<"prova1"<<endl;
 			Eigen::Matrix<double,3,1> posdelta;
 			posdelta<< solution.ee_motion_.at(1)->GetPoint(t).p()-doggo->getBRpos();
-
+			cout<<"prova2"<<endl;
 			Eigen::Matrix<double,3,1> veldelta;
 			veldelta<< solution.ee_motion_.at(1)->GetPoint(t).v()-doggo->getBRvel();
-			
+			cout<<"prova3"<<endl;
 			Eigen::MatrixXd Kp;
 			Kp=250*Eigen::MatrixXd::Identity(3,3);
 			Eigen::MatrixXd Kd;
 			Kd=50*Eigen::MatrixXd::Identity(3,3);
-
+			
 			Eigen::Matrix<double,3,1> accdes=accd+Kd*veldelta+Kp*posdelta;
 
 
@@ -489,7 +495,7 @@ void swing_phasebr( ros::Rate loop_rate, double duration , double duration_prev)
 			{
 				tau1_msg.data.push_back(ta[i]);
 			}
-
+			cout<<"prova4"<<endl;
 			//Sending command
 			_tau_pub.publish(tau1_msg);
 
@@ -497,7 +503,7 @@ void swing_phasebr( ros::Rate loop_rate, double duration , double duration_prev)
 			// One step in gazebo world ( to use if minqp problem takes too long for control loop)
 			pub->Publish(stepper);
 
-			
+			cout<<"prova5"<<endl;
 
 			Eigen::MatrixXd com= doggo->getCOMpos();
 			Eigen::MatrixXd com_vel= doggo->getCOMvel();
@@ -851,7 +857,7 @@ int main(int argc, char **argv){
     }
 	
 	//pause gazebo
-	pauseGazebo.call(pauseSrv);
+	pauseGazebo.call(pauseSrv); //da commentare 
 
 	//Update robot 
 	
@@ -860,7 +866,7 @@ int main(int argc, char **argv){
 	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
 	//traiettoria
-	double ti=0.0, tf=1.5, t=0.0;
+	double ti=0.0, tf=0.5, t=0.0; //rimetti tf 1.5
 	
 	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
 
@@ -990,7 +996,7 @@ int main(int argc, char **argv){
 				
 				// Compute control torque
 				// control vector
-      			//Eigen::VectorXd tau; commentato il 30/3
+      			//Eigen::VectorXd tau; non serve piú perchè l'ho dichiarato globale commentato il 30/3
       			tau.resize(12);
        			tau = doggoControl->Cntr(composdes, comveldes, comaccdes, Kcom, Dcom, 
 				   x_inf, x_sup, y_inf, y_sup);
@@ -1323,8 +1329,8 @@ int main(int argc, char **argv){
 
 		
 	}
-		cout<<"kp"<<endl;
-	//traiettoria per riportare il dogbot nella condizione iniziale
+		/*
+		//traiettoria per riportare il dogbot nella condizione iniziale
 		doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
 		//traiettoria
@@ -1357,9 +1363,10 @@ int main(int argc, char **argv){
 		cout<<"k pest"<<endl;
 		//eseguo_traiettoria->eseguo_traj(begin3, tf3, t3, world_H_base, q_joints, dq_joints, basevel, gravity1,
 		//q_joints_total, dq_joints_total, traj_com3);
+		*/
 		//-----------------------------------------------
 		
-		/*
+		/* //lascia questa parte commentata
 		while ((ros::Time::now()-begin3).toSec() < tf3-0.001)// && cpok)
     	{ 
 			cout<<"mnagg"<<endl;
@@ -1396,6 +1403,7 @@ int main(int argc, char **argv){
 		
 		
 		//-------------------------------------------------------------
+		/*
 		while ((ros::Time::now()-begin3).toSec() < tf3-0.001)// && cpok)
     	{ 
 			t3 = (ros::Time::now()-begin3).toSec();
@@ -1463,7 +1471,80 @@ int main(int argc, char **argv){
 				
 				loop_rate.sleep();
 				
-		}
+		}*/
+
+				doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+				double t_in2=0.0, t_fin2=0.2, t2;
+					
+				MatrixXd com_pos=doggo->getCOMpos();
+				MatrixXd com_vel=doggo->getCOMvel();
+
+				//traiettoria del centro di massa
+				Matrix<double,6,1> init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2;
+	
+				// Initial position
+				init_pos2= doggo->getCOMpos();
+				cpx = com_pos(0)+com_vel(0)/w;
+				cpy = com_pos(1)+com_vel(1)/w;
+					
+					
+				// Desired position
+				end_pos2<<(0.4-coo_ee_br(0))/4, 0.0, 0.0, 0,0,0;//((0.01)/2-coo_ee_bl(0))/2 deve essere lo stesso cpx di prima
+					
+					
+				
+				// Initial velocity
+				init_vel2= doggo->getCOMvel();
+					
+
+				end_vel2 = Matrix<double,6,1>::Zero();
+				end_vel2 = init_acc2 = end_acc2;
+				//std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
+				traiettoria = new TrajPlanner(t_in2, t_fin2, init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2);
+				trajectory_point traj_com2;		
+				traj_com2 = traiettoria->getTraj();
+				//TRAIETTORIA DELLE GAMBE 2
+					
+					
+				Matrix<double,6,1> pos_ini2, pos_fin2, vel_ini2, vel_fin2, acc_ini2, acc_fin2;
+
+				// Initial position
+				pos_ini2<< 0,0,0,0,0,0;
+				
+				// Desired position
+				pos_fin2<<(0.4-coo_ee_br(0))/2, 0, 0.0, 0,0,0;//dopo rimetti 0.2 al terzo elemento mentre al I termine metti (cpx+0.01-coo_ee_br(0))/2
+				
+					
+
+				vel_fin2 = Matrix<double,6,1>::Zero();
+				vel_fin2 = acc_ini2 = acc_fin2 =vel_ini2;
+				traiettoria = new TrajPlanner(t_in2, t_fin2, pos_ini2, pos_fin2, vel_ini2, vel_fin2, acc_ini2, acc_fin2); //prima spline
+				trajectory_point traj2;
+				traj2 = traiettoria->getTraj();
+				
+
+				//while((ros::Time::now()-begin0).toSec() < t_fin2-0.001)// && (!contact_br))//rimetti fr al posto di fl !contact_fl && !contact_br
+				//{	
+					cout<<"ww"<<endl;
+					formulation=computetrajecotry(1);
+					cout<<"ww2"<<endl;
+					
+					auto startend = std::chrono::high_resolution_clock::now();
+					// initial simulation time 
+					begin0 = ros::Time::now();
+					swing_phasebr(loop_rate, formulation.params_.ee_phase_durations_.at(1)[1]+formulation.params_.ee_phase_durations_.at(1)[0] , formulation.params_.ee_phase_durations_.at(1)[0]);
+					
+					auto finishend = std::chrono::high_resolution_clock::now();
+    				std::chrono::duration<double> elapsed2 = finishend - startend;
+					cout<<"ww3"<<endl;
+					if(pauseGazebo.call(pauseSrv))
+        				ROS_INFO("Simulation paused.");
+    				else
+        				ROS_INFO("Failed to pause simulation.");
+					
+					cout<<"ww4"<<endl; 
+					
+				//}
  		
  //pase gazebo call
  pauseGazebo.call(pauseSrv);
