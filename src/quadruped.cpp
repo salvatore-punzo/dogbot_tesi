@@ -1,6 +1,6 @@
 #include "quadruped.h"
 #include "alglib/optimization.h"
-#include "Td_matrix.cpp"
+#include "Td_matrix.cpp" 
 
 QUADRUPED::QUADRUPED()
 {

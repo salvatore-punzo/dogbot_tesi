@@ -154,13 +154,13 @@ Eigen::VectorXd QUADRUPEDStep::CntrOl(iDynTree::Vector6 &CoMPosDes,
 		 break;
 	}
 
-// Compute deltax, deltav
+  // Compute deltax, deltav
 
   Eigen::Matrix<double,6,1> deltax= toEigen(CoMPosDes)-dogbot->getCOMpos();
   Eigen::Matrix<double,6,1> deltav= toEigen(CoMVelDes)-dogbot->getCOMvel();
 
 
-// Compute desired CoM Wrench
+  // Compute desired CoM Wrench
   double mass_robot=dogbot->getMass();
 
   Eigen::MatrixXd g_acc=Eigen::MatrixXd::Zero(6,1);
@@ -180,15 +180,61 @@ Eigen::VectorXd QUADRUPEDStep::CntrOl(iDynTree::Vector6 &CoMPosDes,
    fext_st.block(0,0,3,1)=fext.block(stl1,0,3,1);
    fext_st.block(3,0,3,1)=fext.block(stl2,0,3,1);
    fext_st.block(6,0,3,1)=fext.block(stl3,0,3,1);
+  std::cout<<"prova0"<<endl;
+  std::cout<<"Kcom: "<<endl<<Kcom<<endl;
+  std::cout<<"deltax: "<<endl<<deltax<<endl;
+  std::cout<<"Dcom: "<<endl<<Dcom<<endl;
+  std::cout<<"deltav: "<<endl<<deltav<<endl;
+  std::cout<<"mass_robot: "<<endl<<mass_robot<<endl;
+  std::cout<<"g_acc: "<<endl<<g_acc<<endl;
+  std::cout<<"M_com: "<<endl<<M_com<<endl;
+  std::cout<<"toEigen(CoMAccDes): "<<endl<<toEigen(CoMAccDes)<<endl;
+    Eigen::Matrix<double,6,1> Wcom_des=Kcom*deltax+Dcom*deltav+mass_robot*g_acc+M_com*toEigen(CoMAccDes);
+  std::cout<<"Wcomdes"<<Wcom_des<<std::endl;
+  // Control vector
+    Eigen::VectorXd tau= Eigen::VectorXd::Zero(12);
 
-  Eigen::Matrix<double,6,1> Wcom_des=Kcom*deltax+Dcom*deltav+mass_robot*g_acc+M_com*toEigen(CoMAccDes);
- std::cout<<"Wcomdes"<<Wcom_des<<std::endl;
-// Control vector
-  Eigen::VectorXd tau= Eigen::VectorXd::Zero(12);
-
-// Solve quadratic problem
+  // Solve quadratic problem
   Eigen::Matrix<double,12,1> fext1=Eigen::Matrix<double,12,1>::Zero();
   tau=dogbot->qpproblemol(Wcom_des, vdotswdes, swingleg);
+  
+  return tau;
+
+
+}
+
+Eigen::VectorXd QUADRUPEDStep::Cntr(iDynTree::Vector6 &CoMPosDes,
+                            iDynTree::Vector6 &CoMVelDes,
+                            iDynTree::Vector6 &CoMAccDes,
+                            Eigen::MatrixXd &Kcom,
+                            Eigen::MatrixXd &Dcom,
+                            Eigen::Matrix<double,12,1> &fext)
+{
+
+// Compute deltax, deltav
+
+  Eigen::Matrix<double,6,1> deltax= toEigen(CoMPosDes)-dogbot->getCOMpos();
+  Eigen::Matrix<double,6,1> deltav= toEigen(CoMVelDes)-dogbot->getCOMvel();
+
+
+// Compute desired CoM Wrench
+  double mass_robot=dogbot->getMass();
+
+  Eigen::MatrixXd g_acc=Eigen::MatrixXd::Zero(6,1);
+  g_acc(2,0)=9.81;
+  Eigen::Matrix<double,18,1> deltag=dogbot->getBiasMatrixCOM();
+  
+  const int n=dogbot->getDoFsnumber();
+  Eigen::MatrixXd M_com=dogbot->getMassMatrixCOM_com();
+  Eigen::Matrix<double,12,18> J=dogbot->getJacobianCOM_linear();
+  Eigen::Matrix<double,6,1> Wcom_des=Kcom*deltax+Dcom*deltav+mass_robot*g_acc+M_com*toEigen(CoMAccDes);
+
+// Control vector
+  Eigen::VectorXd tau= Eigen::VectorXd::Zero(12);
+   std::cout<<"Wcomdes"<<Wcom_des<<std::endl;
+// Solve quadratic problem
+   Eigen::Matrix<double,12,1> fext1=Eigen::Matrix<double,12,1>::Zero();
+  tau=dogbot->qpproblem(Wcom_des);
   
   return tau;
 

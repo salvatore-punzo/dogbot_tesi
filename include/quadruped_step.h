@@ -33,6 +33,13 @@ class QUADRUPEDStep
         QUADRUPEDStep();
         QUADRUPEDStep(QUADRUPED &quadruped_);
 
+         Eigen::VectorXd Cntr(iDynTree::Vector6 &CoMPosDes,
+                 iDynTree::Vector6 &CoMVelDes,
+                 iDynTree::Vector6 &CoMAccDes,
+                 Eigen::MatrixXd &Kcom,
+                 Eigen::MatrixXd &Dcom,
+                 Eigen::Matrix<double,12,1> &fext);
+
         VectorXd step(Eigen::Matrix<double,6,1> &CoMPosDes,
                  Eigen::Matrix<double,6,1> &CoMVelDes,
                  Eigen::Matrix<double,6,1> &CoMAccDes,

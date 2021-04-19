@@ -1,5 +1,5 @@
 #ifndef QUADRUPEDMODEL
-#define QUADRUPEDMODEL
+#define QUADRUPEDMODEL 
 
 #include <cstdlib>
 #include <iostream>

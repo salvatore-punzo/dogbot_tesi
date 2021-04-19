@@ -84,6 +84,7 @@ QuadrupedGaitGenerator::SetCombo (Combos combo)
     case C4: SetGaits({Stand, Hop3, Hop3, Hop3, Hop3E, Stand}); break; // gallop
     case C5: SetGaits({Stand, Run1_2});     break; 
     case C6: SetGaits({Stand});     break; 
+    case C7: SetGaits({Walk1s, Stand}); break; //muove la gamba br e poi ritorna nella fase di stand
     default: assert(false); std::cout << "Gait not defined\n"; break;
   }
 }
@@ -95,6 +96,7 @@ QuadrupedGaitGenerator::GetGait(Gaits gait) const
     case Stand:   return GetStrideStand();
     case Flight:  return GetStrideFlight();
     case Walk1:   return GetStrideWalk();
+    case Walk1s:  return GetStrideWalk2();
     case Walk2:   return GetStrideWalkOverlap();
     case Walk2E:  return RemoveTransition(GetStrideWalkOverlap());
     case Run1:    return GetStrideTrot();
@@ -177,6 +179,24 @@ QuadrupedGaitGenerator::GetStrideWalk () const
   {
       bB_, BB_, Bb_, BB_,
       PB_, BB_, BP_, BB_
+  };
+
+  return std::make_pair(times, phase_contacts);
+}
+
+QuadrupedGaitGenerator::GaitInfo
+QuadrupedGaitGenerator::GetStrideWalk2 () const
+{
+  double step  = 0.3;
+  double stand = 0.2;
+  
+  auto times =
+  {
+      step, stand,
+  };
+  auto phase_contacts =
+  {
+      PB_, BB_
   };
 
   return std::make_pair(times, phase_contacts);
