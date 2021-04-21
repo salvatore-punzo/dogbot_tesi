@@ -326,6 +326,7 @@ void stand_phase( ros::Rate loop_rate, double duration )
       }
 }
 
+//swing_phase br e fl (trot)
 void swing_phase( ros::Rate loop_rate, double duration , double duration_prev)
 {	
 
@@ -364,7 +365,7 @@ void swing_phase( ros::Rate loop_rate, double duration , double duration_prev)
 			
 			// std::cout<<"posdesbr"<<trajsw.pos(0,idx)<<" "<<trajsw.pos(1,idx)<<" "<<trajsw.pos(2,idx)<<std::endl;
 			std::cout<<"veldesbr"<<solution.ee_motion_.at(1)->GetPoint(t).v()<<std::endl;
-			std::cout<<"accdesbr"<<solution.ee_motion_.at(2)->GetPoint(t).v()<<std::endl;
+			std::cout<<"accdesbr"<<solution.ee_motion_.at(2)->GetPoint(t).v()<<std::endl; //non dovrebbe essere .at(1)?
 			/* std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;*/
 			Eigen::Matrix<double,6,1> accd;
 			if (flag==0)
@@ -400,9 +401,7 @@ void swing_phase( ros::Rate loop_rate, double duration , double duration_prev)
 				tau = doggoStep->CntrBr(composdes, comveldes, comaccdes,
 												Kcom, Dcom, accdes, QUADRUPED::SWING_LEGS::L2, Eigen::Matrix<double,12,1>::Zero());
             	std::cout<<"accd"<<accd<<std::endl;
-                auto finish2 = std::chrono::high_resolution_clock::now();
-				std::chrono::duration<double> elapsed2 = finish2 - start2;
-				std::cout<<"w3"<<elapsed2.count()<<std::endl;
+               
 			}
        		else if (flag==1)
        		{
@@ -484,7 +483,162 @@ void swing_phase( ros::Rate loop_rate, double duration , double duration_prev)
     }
 }
 
+//swing_phase br fr (bound)
+void swing_phase_b( ros::Rate loop_rate, double duration , double duration_prev)
+{	
 
+	while ((ros::Time::now()-begin0).toSec() < duration && flag==0 )
+    {   auto start2 = std::chrono::high_resolution_clock::now();
+       	//markerMsg.set_id(2);
+
+      	if (joint_state_available && joint_base_available)
+      	{	/*markerMsg.set_id(6);
+      		markerMsg.set_action(ignition::msgs::Marker::ADD_MODIFY);
+    		markerMsg.set_type(ignition::msgs::Marker::TRIANGLE_FAN);
+          	markerMsg.clear_point();
+			*/
+        	Eigen::VectorXd posfoot=Eigen::VectorXd::Zero(3);
+
+			// Update robot
+			doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+			
+
+			// Time
+			double t = (ros::Time::now()-begin0).toSec();
+
+				
+			int idx=std::round( (t+0.225-0.01)*1000);
+      	
+			// Set desired vectors
+			iDynTree::Vector6 composdes, comveldes, comaccdes;
+    
+         
+			toEigen(composdes)<<solution.base_linear_->GetPoint(t).p(), solution.base_angular_->GetPoint(t).p();
+			toEigen(comveldes)<<solution.base_linear_->GetPoint(t).v(), solution.base_angular_->GetPoint(t).v();
+			toEigen(comaccdes) <<solution.base_linear_->GetPoint(t).a(), solution.base_angular_->GetPoint(t).a();
+			std::cout<<"posdes"<<toEigen(composdes)<<std::endl;
+			std::cout<<"veldes"<<toEigen(comveldes)<<std::endl;
+			std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;
+			
+			// std::cout<<"posdesbr"<<trajsw.pos(0,idx)<<" "<<trajsw.pos(1,idx)<<" "<<trajsw.pos(2,idx)<<std::endl;
+			std::cout<<"veldesbr"<<solution.ee_motion_.at(1)->GetPoint(t).v()<<std::endl;
+			std::cout<<"accdesbr"<<solution.ee_motion_.at(3)->GetPoint(t).v()<<std::endl;
+			/* std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;*/
+			Eigen::Matrix<double,6,1> accd;
+			if (flag==0)
+       		{
+				Eigen::Matrix<double,6,1> accd;
+      
+				accd<< solution.ee_motion_.at(1)->GetPoint(t).a(),
+						solution.ee_motion_.at(3)->GetPoint(t).a();
+
+				Eigen::Matrix<double,6,1> posdelta;
+				posdelta<< solution.ee_motion_.at(1)->GetPoint(t).p()-doggo->getBRpos(),
+              	solution.ee_motion_.at(3)->GetPoint(t).p()-doggo->getFRpos();
+
+				Eigen::Matrix<double,6,1> veldelta;
+				veldelta<< solution.ee_motion_.at(1)->GetPoint(t).v()-doggo->getBRvel(),
+					solution.ee_motion_.at(3)->GetPoint(t).v()-doggo->getFRvel();
+        
+				Eigen::MatrixXd Kp;
+				Kp=250*Eigen::MatrixXd::Identity(6,6);
+				Eigen::MatrixXd Kd;
+				Kd=50*Eigen::MatrixXd::Identity(6,6);
+
+				Eigen::Matrix<double,6,1> accdes=accd+Kd*veldelta+Kp*posdelta;
+
+   
+      
+         		Eigen::Matrix<double,12,18> J=doggo->getJacobianCOM_linear();
+            	Eigen::Matrix<double,6,12> Jcom;
+				Jcom.block(0,0,3,12)=J.block(0,6,3,12);
+				Jcom.block(3,0,3,12)=J.block(6,6,3,12);
+  
+     
+				tau = doggoStep->CntrBr(composdes, comveldes, comaccdes,
+												Kcom, Dcom, accdes, QUADRUPED::SWING_LEGS::L4, Eigen::Matrix<double,12,1>::Zero());
+            	std::cout<<"accd"<<accd<<std::endl;
+               
+			}
+       		else if (flag==1)
+       		{
+				Eigen::Matrix<double,3,1> accd;
+       			accd<< solution.ee_motion_.at(1)->GetPoint(t).a();
+      		}
+       		else if (flag==2)
+       		{
+				Eigen::Matrix<double,3,1> accd;
+    			accd<< solution.ee_motion_.at(3)->GetPoint(t).a();
+   			}
+			
+			// Compute control torque
+		
+			std::cout<<"tau"<<tau<<std::endl;
+
+			// Set command message
+			tau1_msg.data.clear();
+			std::vector<double> ta(12,0.0);
+
+			// torques in right order
+			ta[11]=tau(7);
+			ta[10]=tau(6);
+			ta[9]=tau(2);
+			ta[8]=tau(5);
+			ta[7]=tau(4);
+			ta[6]=tau(3);
+			ta[5]=tau(9);
+			ta[4]=tau(8);
+			ta[3]=tau(1);
+			ta[2]=tau(11);
+			ta[1]=tau(10);
+			ta[0]=tau(0);
+
+
+      		// Fill Command message
+      		for(int i=0; i<12; i++)
+      		{
+   				tau1_msg.data.push_back(ta[i]);
+       		}
+
+       		//Sending command
+        	_tau_pub.publish(tau1_msg);
+
+    
+      		// One step in gazebo world ( to use if minqp problem takes too long for control loop)
+     		pub->Publish(stepper);
+
+       		////////
+
+			Eigen::MatrixXd com= doggo->getCOMpos();
+			Eigen::MatrixXd com_vel= doggo->getCOMvel();
+
+   
+        	ros::spinOnce();
+       		if(t>duration-0.05)
+        	{
+				//node_ign.Request("/marker", markerMsg);
+			}
+
+       		if(contact_br==false && contact_fr==true && t>duration-0.1)
+      		{
+				flag=1;
+       			std::cout<<"contact"<<contact_fr<<std::endl;
+			}
+      		else if(contact_br==true && contact_fr==false && t>duration-0.1)
+      		{
+				flag=2;
+       			std::cout<<"contact"<<contact_br<<std::endl;
+			}
+      		else if(contact_br==true && contact_fr==true && t>duration-0.1)
+      		{
+				flag=3;
+				std::cout<<"contact"<<contact_br<<std::endl;
+				std::cout<<"contact"<<contact_fr<<std::endl;
+			}
+        	loop_rate.sleep();
+		}
+    }
+}
 void swing_phasebr( ros::Rate loop_rate, double duration , double duration_prev)
 {
 	cout<<"tempo corrente: "<<ros::Time::now()-begin0<<endl;
@@ -520,10 +674,9 @@ void swing_phasebr( ros::Rate loop_rate, double duration , double duration_prev)
 			std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;
 			
 			
-			cout<<"solution.ee_motion.at(1):"<<endl<<solution.ee_motion_.at(1)<<endl;
 			Eigen::Matrix<double,3,1> accd;
 			cout<<"accd: "<<endl<<solution.ee_motion_.at(1)->GetPoint(t).a()<<endl;
-			accd<< solution.ee_motion_.at(1)->GetPoint(t).a(); //eigen error 
+			accd<< solution.ee_motion_.at(1)->GetPoint(t).a();  
 			cout<<"prova1"<<endl;
 			Eigen::Matrix<double,3,1> posdelta;
 			posdelta<< solution.ee_motion_.at(1)->GetPoint(t).p()-doggo->getBRpos();
@@ -725,7 +878,7 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
    // formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1]-0.05, 0.40229;
     //formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
  // }
-	formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[1]+0.2, 0, 0.0;
+	formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0, 0.0;
 	formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
   
 
@@ -772,8 +925,16 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
    }
    */
   	std::cout<<"a"<<endl;
-	if (gait_flag==1){
+	if (gait_flag==1){ //muovo solo la gamba br
     auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C7);
+  	gait_gen_->SetCombo(id_gait);
+   }
+   if (gait_flag==2){ //muovo br e fl (trot)
+    auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C5);
+  	gait_gen_->SetCombo(id_gait);
+   }
+    if (gait_flag==3){//muovo br e fr (bound)
+    auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C8);
   	gait_gen_->SetCombo(id_gait);
    }
 	std::cout<<"a2"<<endl;
@@ -799,11 +960,13 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
     nlp.AddCostSet(c);
     std::cout<<"ciao"<<std::endl;
      std::cout<<"size"<<formulation_.params_.GetEECount()<<std::endl;
-
+ 
+ //cout<<"formulation:"<<endl<<formulation_.GetVariableSets(solution)<<endl;
+ 
  for (int ee=0; ee<4; ++ee) {
     for (int i=0; i<formulation_.params_.ee_phase_durations_.at(ee).size(); ++i){
-  std::cout<<"size"<<ee<<std::endl;
-  std::cout<<"size"<<formulation_.params_.ee_phase_durations_.at(ee)[i]<<std::endl;
+  std::cout<<"ee: "<<ee<<std::endl;
+  std::cout<<"phase duration: "<<formulation_.params_.ee_phase_durations_.at(ee)[i]<<std::endl;
   }}
 	std::cout<<"a3"<<endl;
   auto solver = std::make_shared<ifopt::IpoptSolver>();
@@ -812,7 +975,8 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
   std::cout<<"a4.1"<<endl;
   solver->SetOption("max_cpu_time", 20.0);
 	std::cout<<"a4.2"<<endl;
-  solver->Solve(nlp);
+  solver->Solve(nlp);//eigen error
+  
    std::cout<<"a5"<<endl;
   return formulation_;
 	std::cout<<"a5.1"<<endl;
@@ -1049,7 +1213,7 @@ int main(int argc, char **argv){
 			
 				capture_point_file<<cpx<<" "<<cpy<<"\n";
 				capture_point_file.flush();
-				if(cpx > x_sup)
+				if(cpx > x_sup-0.02)
 				{	
 					cpok = false;
 					
@@ -1130,7 +1294,7 @@ int main(int argc, char **argv){
 		
 	}
 	
-	
+	/*
 	if(cpok==false)//memo rimetti la condizione uguale a false 
 	{
 		//traiettoria 1
@@ -1415,6 +1579,7 @@ int main(int argc, char **argv){
 
 		
 	}
+	*/
 		/*
 		//traiettoria per riportare il dogbot nella condizione iniziale
 		doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
@@ -1560,74 +1725,54 @@ int main(int argc, char **argv){
 		}*/
 
 				doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
-				double t_in2=0.0, t_fin2=0.2, t2;
+			
 					
 				MatrixXd com_pos=doggo->getCOMpos();
 				MatrixXd com_vel=doggo->getCOMvel();
 
-				//traiettoria del centro di massa
-				Matrix<double,6,1> init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2;
-	
-				// Initial position
-				init_pos2= doggo->getCOMpos();
+			
 				cpx = com_pos(0)+com_vel(0)/w;
 				cpy = com_pos(1)+com_vel(1)/w;
 					
 					
-				// Desired position
-				end_pos2<<(0.4-coo_ee_br(0))/4, 0.0, 0.0, 0,0,0;//((0.01)/2-coo_ee_bl(0))/2 deve essere lo stesso cpx di prima
-					
-					
 				
-				// Initial velocity
-				init_vel2= doggo->getCOMvel();
-					
-
-				end_vel2 = Matrix<double,6,1>::Zero();
-				end_vel2 = init_acc2 = end_acc2;
-				//std::cout<<"acc"<<init_acc<<"acc2"<<end_acc<<std::endl;
-				traiettoria = new TrajPlanner(t_in2, t_fin2, init_pos2, end_pos2, init_vel2, end_vel2, init_acc2, end_acc2);
-				trajectory_point traj_com2;		
-				traj_com2 = traiettoria->getTraj();
-				//TRAIETTORIA DELLE GAMBE 2
-					
-					
-				Matrix<double,6,1> pos_ini2, pos_fin2, vel_ini2, vel_fin2, acc_ini2, acc_fin2;
-
-				// Initial position
-				pos_ini2<< 0,0,0,0,0,0;
-				
-				// Desired position
-				pos_fin2<<(0.4-coo_ee_br(0))/2, 0, 0.0, 0,0,0;//dopo rimetti 0.2 al terzo elemento mentre al I termine metti (cpx+0.01-coo_ee_br(0))/2
-				
-					
-
-				vel_fin2 = Matrix<double,6,1>::Zero();
-				vel_fin2 = acc_ini2 = acc_fin2 =vel_ini2;
-				traiettoria = new TrajPlanner(t_in2, t_fin2, pos_ini2, pos_fin2, vel_ini2, vel_fin2, acc_ini2, acc_fin2); //prima spline
-				trajectory_point traj2;
-				traj2 = traiettoria->getTraj();
 				
 
 				//while((ros::Time::now()-begin0).toSec() < t_fin2-0.001)// && (!contact_br))//rimetti fr al posto di fl !contact_fl && !contact_br
 				//{	
-					cout<<"ww"<<endl;
-					formulation=computetrajecotry(1);
-					cout<<"ww2"<<endl;
 					
-					
-					// initial simulation time 
-					begin0 = ros::Time::now();
-					swing_phasebr(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0] , formulation.params_.ee_phase_durations_.at(1)[0]);
-					stand_phase(loop_rate, formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[0]);
-					
-					cout<<"ww3"<<endl;
+					int movimento=2;
+
+					if (movimento ==1){//muovo solo br
+						formulation=computetrajecotry(1);
+						begin0 = ros::Time::now();	
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]);
+						swing_phasebr(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0]+formulation.params_.ee_phase_durations_.at(1)[1] , formulation.params_.ee_phase_durations_.at(1)[0]);
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);
+					}
+					else if (movimento == 2){ //muovo br e fl (trot)
+						formulation=computetrajecotry(2);
+						
+						// initial simulation time 
+						begin0 = ros::Time::now();
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]);
+						swing_phase(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0]+formulation.params_.ee_phase_durations_.at(1)[1] , formulation.params_.ee_phase_durations_.at(1)[0]);
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);
+					}
+					else if (movimento == 3){ //muovo br e fr (bound)
+						formulation=computetrajecotry(3);
+						// initial simulation time 
+						begin0 = ros::Time::now();
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]);
+						swing_phase_b(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0]+formulation.params_.ee_phase_durations_.at(1)[1] , formulation.params_.ee_phase_durations_.at(1)[0]);
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);
+					}
 					if(pauseGazebo.call(pauseSrv))
         				ROS_INFO("Simulation paused.");
     				else
         				ROS_INFO("Failed to pause simulation.");
 					
-					cout<<"ww4"<<endl; 
+					
 					
 				//}
  		

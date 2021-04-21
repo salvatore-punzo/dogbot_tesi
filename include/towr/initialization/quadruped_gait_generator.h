@@ -59,6 +59,7 @@ private:
   GaitInfo GetStridePace() const;
   GaitInfo GetStridePaceEnd() const;
   GaitInfo GetStrideBound() const;
+  GaitInfo GetStrideBound2() const;
   GaitInfo GetStrideBoundEnd () const;
   GaitInfo GetStrideGallop() const;
   GaitInfo GetStridePronk() const;

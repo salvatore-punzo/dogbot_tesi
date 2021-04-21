@@ -1673,7 +1673,7 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 		swl2=0; 
 		stl1=0;//0 indica br; 3 bl; 6->fl; 9->fr
 		stl2=0; 
-		break;
+		 break;
 		case L2: swl1=0;
 		swl2=6 ;
 		stl1=3;
@@ -1683,6 +1683,11 @@ Eigen::VectorXd QUADRUPED::qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eig
 		swl2=9;
 		stl1=0;
 		stl2=6; 
+		 break;
+		case L4: swl1=0;
+		swl2=9;
+		stl1=3;
+		stl2=6;
 		 break;
 	}
 

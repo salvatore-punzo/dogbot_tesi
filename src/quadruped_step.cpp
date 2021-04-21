@@ -79,6 +79,11 @@ Eigen::VectorXd QUADRUPEDStep::CntrBr(iDynTree::Vector6 &CoMPosDes,
 		stl1=0;
 		stl2=6; 
 		 break;
+    case QUADRUPED::L4: swl1=0;
+    swl2=9;
+    stl1=3;
+    stl2=6;
+    break;    
 	}
 
 // Compute deltax, deltav
