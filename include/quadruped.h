@@ -35,7 +35,7 @@ class QUADRUPED
   enum SWING_LEG { BR, FL, BL, FR}; // 4 legs, br-fl, bl-fr
   Eigen::VectorXd qpproblemol( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::Vector3d vdotswdes,  SWING_LEG swingleg);
   //task per il moto di due gambe
-  enum SWING_LEGS { L1, L2, L3,L4}; // 4 legs, br-fl, bl-fr
+  enum SWING_LEGS { L1, L2, L3, L4, L5, L6, L7}; // 4 legs, br-fl, bl-fr
   Eigen::VectorXd qpproblembr( Eigen::Matrix<double,6,1> &Wcom_des, Eigen::VectorXd vdotswdes, SWING_LEGS swinglegs, Eigen::Matrix<double,12,1> fext);
   // get function
 	Eigen::VectorXd getBiasMatrix();
@@ -59,6 +59,8 @@ class QUADRUPED
   Eigen::MatrixXd getJCOMMatrix();
   Eigen::MatrixXd getJCOMDot();
   Eigen::MatrixXd getTdotMatrix();
+
+  
   double getMass();
   int getDoFsnumber();
 
