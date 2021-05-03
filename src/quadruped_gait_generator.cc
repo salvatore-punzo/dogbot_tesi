@@ -88,6 +88,8 @@ QuadrupedGaitGenerator::SetCombo (Combos combo)
     case C8: SetGaits({Stand,Hop1_3}); break;
     case C9: SetGaits({Stand, Hop0_2}); break;
     case C10: SetGaits({Stand, Hop2_3}); break;
+    case C11: SetGaits({Stand, Hop0_1}); break;
+    case C12: SetGaits({Stand, Run0_3}); break;
     default: assert(false); std::cout << "Gait not defined\n"; break;
   }
 }
@@ -104,6 +106,7 @@ QuadrupedGaitGenerator::GetGait(Gaits gait) const
     case Walk2E:  return RemoveTransition(GetStrideWalkOverlap());
     case Run1:    return GetStrideTrot();
     case Run1_2:  return GetStrideTrot2();
+    case Run0_3:  return GetStrideTrot3();
     case Run2:    return GetStrideTrotFly();
     case Run2E:   return GetStrideTrotFlyEnd();
     case Run3:    return GetStridePace();
@@ -112,6 +115,7 @@ QuadrupedGaitGenerator::GetGait(Gaits gait) const
     case Hop1_3:  return GetStridePace2();
     case Hop0_2:  return GetStridePace3();
     case Hop2_3:  return GetStrideBound2();
+    case Hop0_1:  return GetStrideBound3();
     case Hop1E:   return GetStrideBoundEnd();
     case Hop2:    return GetStridePronk();
     case Hop3:    return GetStrideGallop();
@@ -258,11 +262,28 @@ QuadrupedGaitGenerator::GetStrideTrot2 () const
   double t_stand = 0.2;
   auto times =
   {
-      t_step, t_stand,  t_step, t_stand,
+      t_step, t_stand, 
   };
   auto phase_contacts =
   {
-      Pb_, BB_, bP_, BB_,
+      bP_, BB_,
+  };
+
+  return std::make_pair(times, phase_contacts);
+}
+
+QuadrupedGaitGenerator::GaitInfo
+QuadrupedGaitGenerator::GetStrideTrot3 () const
+{
+  double t_step = 0.3;
+  double t_stand = 0.2;
+  auto times =
+  {
+      t_step, t_stand,
+  };
+  auto phase_contacts =
+  {
+      Pb_, BB_,
   };
 
   return std::make_pair(times, phase_contacts);
@@ -370,6 +391,24 @@ QuadrupedGaitGenerator::GetStrideBound2 () const
   return std::make_pair(times, phase_contacts);
 }
 
+QuadrupedGaitGenerator::GaitInfo
+QuadrupedGaitGenerator::GetStrideBound3 () const
+{
+  double step  = 0.3;
+  double stand = 0.2;
+
+  auto times =
+  {
+      step, stand
+  };
+  auto phase_contacts =
+  {
+      BI_, BB_
+  };
+
+  return std::make_pair(times, phase_contacts);
+}
+
 
 QuadrupedGaitGenerator::GaitInfo
 QuadrupedGaitGenerator::GetStridePace2 () const
@@ -416,7 +455,7 @@ QuadrupedGaitGenerator::GetStrideBoundEnd () const
   };
   auto phase_contacts =
   {
-      BI_,
+      IB_,
   };
 
   return std::make_pair(times, phase_contacts);

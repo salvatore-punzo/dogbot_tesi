@@ -106,6 +106,7 @@ string modelFile="/home/salvatore/ros_ws/src/DogBotV4/ROS/src/dogbot_description
 	std::ofstream com_file("com_file.txt");
 	std::ofstream foothold_file("foothold.txt");
 	std::ofstream foothold_br_file("foothold_br_file.txt");
+	std::ofstream foothold_fl_file("foothold_fl_file.txt");
 	std::ofstream foothold_des_file("foothold_des.txt");
 	std::ofstream capture_point_file("capture_point.txt");
 	std::ofstream tempo_simulazione_file("tempo_simulazione.txt");
@@ -320,6 +321,8 @@ void stand_phase( ros::Rate loop_rate, double duration )
    
 		foothold_br_file<<coo_ee_br(0)<<" "<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<"\n";
 		foothold_br_file.flush();
+		foothold_fl_file<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "<<"\n";
+		foothold_fl_file.flush();
    	 	Eigen::MatrixXd com= doggo->getCOMpos();
     	Eigen::MatrixXd com_vel= doggo->getCOMvel();
 
@@ -487,6 +490,160 @@ void swing_phase( ros::Rate loop_rate, double duration , double duration_prev)
 		}
     }
 }
+
+//swing_phase bl e fr (trot)
+void swing_phase2( ros::Rate loop_rate, double duration , double duration_prev)
+{	
+
+	while ((ros::Time::now()-begin0).toSec() < duration && flag==0 )
+    {   
+
+      	if (joint_state_available && joint_base_available)
+      	{	
+        	Eigen::VectorXd posfoot=Eigen::VectorXd::Zero(3);
+
+			// Update robot
+			doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+			
+
+			// Time
+			double t = (ros::Time::now()-begin0).toSec();
+
+				
+			int idx=std::round( (t+0.225-0.01)*1000);
+      	
+			// Set desired vectors
+			iDynTree::Vector6 composdes, comveldes, comaccdes;
+    
+         
+			toEigen(composdes)<<solution.base_linear_->GetPoint(t).p(), solution.base_angular_->GetPoint(t).p();
+			toEigen(comveldes)<<solution.base_linear_->GetPoint(t).v(), solution.base_angular_->GetPoint(t).v();
+			toEigen(comaccdes) <<solution.base_linear_->GetPoint(t).a(), solution.base_angular_->GetPoint(t).a();
+			std::cout<<"posdes"<<toEigen(composdes)<<std::endl;
+			std::cout<<"veldes"<<toEigen(comveldes)<<std::endl;
+			std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;
+			
+			// std::cout<<"posdesbr"<<trajsw.pos(0,idx)<<" "<<trajsw.pos(1,idx)<<" "<<trajsw.pos(2,idx)<<std::endl;
+			std::cout<<"veldesbr"<<solution.ee_motion_.at(0)->GetPoint(t).v()<<std::endl;
+			std::cout<<"accdesbr"<<solution.ee_motion_.at(3)->GetPoint(t).v()<<std::endl; //non dovrebbe essere .at(1)?
+			/* std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;*/
+			Eigen::Matrix<double,6,1> accd;
+			if (flag==0)
+       		{
+				Eigen::Matrix<double,6,1> accd;
+      
+				accd<< solution.ee_motion_.at(0)->GetPoint(t).a(),
+						solution.ee_motion_.at(3)->GetPoint(t).a();
+
+				Eigen::Matrix<double,6,1> posdelta;
+				posdelta<< solution.ee_motion_.at(0)->GetPoint(t).p()-doggo->getBLpos(),
+              	solution.ee_motion_.at(3)->GetPoint(t).p()-doggo->getFRpos();
+
+				Eigen::Matrix<double,6,1> veldelta;
+				veldelta<< solution.ee_motion_.at(0)->GetPoint(t).v()-doggo->getBLvel(),
+					solution.ee_motion_.at(3)->GetPoint(t).v()-doggo->getFRvel();
+        
+				Eigen::MatrixXd Kp;
+				Kp=250*Eigen::MatrixXd::Identity(6,6);
+				Eigen::MatrixXd Kd;
+				Kd=50*Eigen::MatrixXd::Identity(6,6);
+
+				Eigen::Matrix<double,6,1> accdes=accd+Kd*veldelta+Kp*posdelta;
+
+   
+      
+         		Eigen::Matrix<double,12,18> J=doggo->getJacobianCOM_linear();
+            	Eigen::Matrix<double,6,12> Jcom;
+				Jcom.block(0,0,3,12)=J.block(0,6,3,12);
+				Jcom.block(3,0,3,12)=J.block(6,6,3,12);
+  
+     
+				tau = doggoStep->CntrBr(composdes, comveldes, comaccdes,
+												Kcom, Dcom, accdes, QUADRUPED::SWING_LEGS::L3, Eigen::Matrix<double,12,1>::Zero());
+            	std::cout<<"accd"<<accd<<std::endl;
+               
+			}
+       		else if (flag==1)
+       		{
+				Eigen::Matrix<double,3,1> accd;
+       			accd<< solution.ee_motion_.at(0)->GetPoint(t).a();
+      		}
+       		else if (flag==2)
+       		{
+				Eigen::Matrix<double,3,1> accd;
+    			accd<< solution.ee_motion_.at(3)->GetPoint(t).a();
+   			}
+			
+			// Compute control torque
+		
+			std::cout<<"tau"<<tau<<std::endl;
+
+			// Set command message
+			tau1_msg.data.clear();
+			std::vector<double> ta(12,0.0);
+
+			// torques in right order
+			ta[11]=tau(7);
+			ta[10]=tau(6);
+			ta[9]=tau(2);
+			ta[8]=tau(5);
+			ta[7]=tau(4);
+			ta[6]=tau(3);
+			ta[5]=tau(9);
+			ta[4]=tau(8);
+			ta[3]=tau(1);
+			ta[2]=tau(11);
+			ta[1]=tau(10);
+			ta[0]=tau(0);
+
+
+      		// Fill Command message
+      		for(int i=0; i<12; i++)
+      		{
+   				tau1_msg.data.push_back(ta[i]);
+       		}
+
+       		//Sending command
+        	_tau_pub.publish(tau1_msg);
+
+    
+      		// One step in gazebo world ( to use if minqp problem takes too long for control loop)
+     		pub->Publish(stepper);
+
+       		////////
+
+			Eigen::MatrixXd com= doggo->getCOMpos();
+			Eigen::MatrixXd com_vel= doggo->getCOMvel();
+
+			//foothold_br_file<<coo_ee_br(0)<<" "<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<"\n";
+			//foothold_br_file.flush();
+			
+        	ros::spinOnce();
+       		if(t>duration-0.05)
+        	{
+				//node_ign.Request("/marker", markerMsg);
+			}
+
+       		if(contact_bl==false && contact_fr==true && t>duration-0.1)
+      		{
+				flag=1;
+       			std::cout<<"contact"<<contact_fr<<std::endl;
+			}
+      		else if(contact_bl==true && contact_fr==false && t>duration-0.1)
+      		{
+				flag=2;
+       			std::cout<<"contact"<<contact_bl<<std::endl;
+			}
+      		else if(contact_bl==true && contact_fr==true && t>duration-0.1)
+      		{
+				flag=3;
+				std::cout<<"contact"<<contact_bl<<std::endl;
+				std::cout<<"contact"<<contact_fr<<std::endl;
+			}
+        	loop_rate.sleep();
+		}
+    }
+}
 //swing_phase fl fr (bound)
 void swing_phase_b( ros::Rate loop_rate, double duration , double duration_prev)
 {	
@@ -615,8 +772,8 @@ void swing_phase_b( ros::Rate loop_rate, double duration , double duration_prev)
 
 			Eigen::MatrixXd com= doggo->getCOMpos();
 			Eigen::MatrixXd com_vel= doggo->getCOMvel();
-			//foothold_br_file<<coo_ee_br(0)<<" "<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<"\n";
-			//foothold_br_file.flush();
+			foothold_fl_file<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "<<"\n";
+			foothold_fl_file.flush();
 
    
         	ros::spinOnce();
@@ -640,6 +797,164 @@ void swing_phase_b( ros::Rate loop_rate, double duration , double duration_prev)
 				flag=3;
 				std::cout<<"contact"<<contact_fl<<std::endl;
 				std::cout<<"contact"<<contact_fr<<std::endl;
+			}
+        	loop_rate.sleep();
+		}
+    }
+}
+
+void swing_phase_b2( ros::Rate loop_rate, double duration , double duration_prev)
+{	
+
+	while ((ros::Time::now()-begin0).toSec() < duration && flag==0 )
+    {   auto start2 = std::chrono::high_resolution_clock::now();
+       	//markerMsg.set_id(2);
+
+      	if (joint_state_available && joint_base_available)
+      	{	/*markerMsg.set_id(6);
+      		markerMsg.set_action(ignition::msgs::Marker::ADD_MODIFY);
+    		markerMsg.set_type(ignition::msgs::Marker::TRIANGLE_FAN);
+          	markerMsg.clear_point();
+			*/
+        	Eigen::VectorXd posfoot=Eigen::VectorXd::Zero(3);
+
+			// Update robot
+			doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
+			
+
+			// Time
+			double t = (ros::Time::now()-begin0).toSec();
+
+				
+			int idx=std::round( (t+0.225-0.01)*1000);
+      	
+			// Set desired vectors
+			iDynTree::Vector6 composdes, comveldes, comaccdes;
+    
+         
+			toEigen(composdes)<<solution.base_linear_->GetPoint(t).p(), solution.base_angular_->GetPoint(t).p();
+			toEigen(comveldes)<<solution.base_linear_->GetPoint(t).v(), solution.base_angular_->GetPoint(t).v();
+			toEigen(comaccdes) <<solution.base_linear_->GetPoint(t).a(), solution.base_angular_->GetPoint(t).a();
+			std::cout<<"posdes"<<toEigen(composdes)<<std::endl;
+			std::cout<<"veldes"<<toEigen(comveldes)<<std::endl;
+			std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;
+			
+			// std::cout<<"posdesbr"<<trajsw.pos(0,idx)<<" "<<trajsw.pos(1,idx)<<" "<<trajsw.pos(2,idx)<<std::endl;
+			std::cout<<"veldesbr"<<solution.ee_motion_.at(0)->GetPoint(t).v()<<std::endl;
+			std::cout<<"accdesbr"<<solution.ee_motion_.at(1)->GetPoint(t).v()<<std::endl;
+			/* std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;*/
+			Eigen::Matrix<double,6,1> accd;
+			if (flag==0)
+       		{
+				Eigen::Matrix<double,6,1> accd;
+      
+				accd<< solution.ee_motion_.at(0)->GetPoint(t).a(),
+						solution.ee_motion_.at(1)->GetPoint(t).a();
+
+				Eigen::Matrix<double,6,1> posdelta;
+				posdelta<< solution.ee_motion_.at(0)->GetPoint(t).p()-doggo->getBLpos(),
+              	solution.ee_motion_.at(1)->GetPoint(t).p()-doggo->getBRpos();
+
+				Eigen::Matrix<double,6,1> veldelta;
+				veldelta<< solution.ee_motion_.at(1)->GetPoint(t).v()-doggo->getBRvel(),
+					solution.ee_motion_.at(0)->GetPoint(t).v()-doggo->getBLvel();
+        
+				Eigen::MatrixXd Kp;
+				Kp=250*Eigen::MatrixXd::Identity(6,6);
+				Eigen::MatrixXd Kd;
+				Kd=50*Eigen::MatrixXd::Identity(6,6);
+
+				Eigen::Matrix<double,6,1> accdes=accd+Kd*veldelta+Kp*posdelta;
+
+   
+      
+         		Eigen::Matrix<double,12,18> J=doggo->getJacobianCOM_linear();
+            	Eigen::Matrix<double,6,12> Jcom;
+				Jcom.block(0,0,3,12)=J.block(0,6,3,12);
+				Jcom.block(3,0,3,12)=J.block(6,6,3,12);
+  
+     
+				tau = doggoStep->CntrBr(composdes, comveldes, comaccdes,
+												Kcom, Dcom, accdes, QUADRUPED::SWING_LEGS::L7, Eigen::Matrix<double,12,1>::Zero());
+            	std::cout<<"accd"<<accd<<std::endl;
+               
+			}
+       		else if (flag==1)
+       		{
+				Eigen::Matrix<double,3,1> accd;
+       			accd<< solution.ee_motion_.at(0)->GetPoint(t).a();
+      		}
+       		else if (flag==2)
+       		{
+				Eigen::Matrix<double,3,1> accd;
+    			accd<< solution.ee_motion_.at(1)->GetPoint(t).a();
+   			}
+			
+			// Compute control torque
+		
+			std::cout<<"tau"<<tau<<std::endl;
+
+			// Set command message
+			tau1_msg.data.clear();
+			std::vector<double> ta(12,0.0);
+
+			// torques in right order
+			ta[11]=tau(7);
+			ta[10]=tau(6);
+			ta[9]=tau(2);
+			ta[8]=tau(5);
+			ta[7]=tau(4);
+			ta[6]=tau(3);
+			ta[5]=tau(9);
+			ta[4]=tau(8);
+			ta[3]=tau(1);
+			ta[2]=tau(11);
+			ta[1]=tau(10);
+			ta[0]=tau(0);
+
+
+      		// Fill Command message
+      		for(int i=0; i<12; i++)
+      		{
+   				tau1_msg.data.push_back(ta[i]);
+       		}
+
+       		//Sending command
+        	_tau_pub.publish(tau1_msg);
+
+    
+      		// One step in gazebo world ( to use if minqp problem takes too long for control loop)
+     		pub->Publish(stepper);
+
+       		////////
+
+			Eigen::MatrixXd com= doggo->getCOMpos();
+			Eigen::MatrixXd com_vel= doggo->getCOMvel();
+			foothold_br_file<<coo_ee_br(0)<<" "<<coo_ee_br(1)<<" "<<coo_ee_br(2)<<" "<<"\n";
+			foothold_br_file.flush();
+
+   
+        	ros::spinOnce();
+       		if(t>duration-0.05)
+        	{
+				//node_ign.Request("/marker", markerMsg);
+			}
+
+       		if(contact_bl==false && contact_br==true && t>duration-0.1)
+      		{
+				flag=1;
+       			std::cout<<"contact"<<contact_br<<std::endl;
+			}
+      		else if(contact_bl==true && contact_br==false && t>duration-0.1)
+      		{
+				flag=2;
+       			std::cout<<"contact"<<contact_bl<<std::endl;
+			}
+      		else if(contact_bl==true && contact_br==true && t>duration-0.1)
+      		{
+				flag=3;
+				std::cout<<"contact"<<contact_bl<<std::endl;
+				std::cout<<"contact"<<contact_br<<std::endl;
 			}
         	loop_rate.sleep();
 		}
@@ -858,8 +1173,8 @@ void swing_phase_p2( ros::Rate loop_rate, double duration , double duration_prev
               	solution.ee_motion_.at(2)->GetPoint(t).p()-doggo->getFLpos();
 
 				Eigen::Matrix<double,6,1> veldelta;
-				veldelta<< solution.ee_motion_.at(1)->GetPoint(t).v()-doggo->getBRvel(),
-					solution.ee_motion_.at(3)->GetPoint(t).v()-doggo->getFRvel();
+				veldelta<< solution.ee_motion_.at(0)->GetPoint(t).v()-doggo->getBLvel(),
+					solution.ee_motion_.at(2)->GetPoint(t).v()-doggo->getFLvel();
         
 				Eigen::MatrixXd Kp;
 				Kp=250*Eigen::MatrixXd::Identity(6,6);
@@ -932,8 +1247,8 @@ void swing_phase_p2( ros::Rate loop_rate, double duration , double duration_prev
 
 			Eigen::MatrixXd com= doggo->getCOMpos();
 			Eigen::MatrixXd com_vel= doggo->getCOMvel();
-			//foothold_br_file<<coo_ee_bl(0)<<" "<<coo_ee_bl(1)<<" "<<coo_ee_bl(2)<<" "<<"\n";
-			//foothold_br_file.flush();
+			foothold_fl_file<<coo_ee_fl(0)<<" "<<coo_ee_fl(1)<<" "<<coo_ee_fl(2)<<" "<<"\n";
+			foothold_fl_file.flush();
 
    
         	ros::spinOnce();
@@ -1105,8 +1420,8 @@ void swing_phasefr( ros::Rate loop_rate, double duration , double duration_prev)
 			std::cout<<"accdes"<<toEigen(comaccdes)<<std::endl;
 			
 			//std::cout<<"posdesbr"<<trajsw.pos(0,idx)<<" "<<trajsw.pos(1,idx)<<" "<<trajsw.pos(2,idx)<<std::endl;
-			std::cout<<"veldesbr"<<solution.ee_motion_.at(1)->GetPoint(t).v()<<std::endl;
-			std::cout<<"accdesbr"<<solution.ee_motion_.at(2)->GetPoint(t).v()<<std::endl;
+			std::cout<<"veldesbr"<<solution.ee_motion_.at(3)->GetPoint(t).v()<<std::endl;
+			std::cout<<"accdesbr"<<solution.ee_motion_.at(3)->GetPoint(t).v()<<std::endl;
 			
 			Eigen::Matrix<double,3,1> accd;
 			accd<< solution.ee_motion_.at(3)->GetPoint(t).a();
@@ -1203,16 +1518,29 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
     //formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
  // }
  	if(gait_flag<4){
+		//formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0.0;//dopo rimetti formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0
+		//formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
 		formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0, 0.0;
 		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
 	}
-	else if(gait_flag==4){
-		formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[1], 0, 0.0; //cosa significa quell'1 tra parentesi?
+	else if(gait_flag==4 ){
+		//formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[0], 0, 0.0; //cosa significa quell'1 tra parentesi?
+		//formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+		formulation_.final_base_.lin.at(towr::kPos) << 0,formulation_.initial_base_.lin.at(towr::kPos)[1], 0.0; //cosa significa quell'1 tra parentesi?
 		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
 	}
-	else if(gait_flag>4)
+	else if(gait_flag==5)
 	{
 		formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0.0;
+		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+	}
+	else if(gait_flag==6)
+	{
+		formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1], 0.0;
+		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+	}
+	if(gait_flag==7){
+		formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1], 0.0;
 		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
 	}
 
@@ -1267,17 +1595,25 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
     auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C5);
   	gait_gen_->SetCombo(id_gait);
    }
-    if (gait_flag==3){//muovo br e fr (bound)
+    if (gait_flag==3){//muovo br e fr (pace)
     auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C8);
   	gait_gen_->SetCombo(id_gait);
    }
-    if (gait_flag==4){//muovo bl e fl (bound)
+    if (gait_flag==4){//muovo bl e fl (pace)
     auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C9);
   	gait_gen_->SetCombo(id_gait);
    }
    cout<<"a2"<<endl;
-   if (gait_flag==5){//muovo fl e fr (pace)
+   if (gait_flag==5){//muovo fl e fr (bound)
     auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C10);
+  	gait_gen_->SetCombo(id_gait);
+   }
+     if (gait_flag==6){//muovo br e bl (bound)
+    auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C11);
+  	gait_gen_->SetCombo(id_gait);
+   }
+   if (gait_flag==7){//muovo br e fl (trot)
+    auto id_gait   = static_cast<towr::GaitGenerator::Combos>(towr::GaitGenerator::C12);
   	gait_gen_->SetCombo(id_gait);
    }
 	cout<<"a3"<<endl;
@@ -1459,7 +1795,7 @@ int main(int argc, char **argv){
 	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
 	//traiettoria
-	double ti=0.0, tf=1.5, t=0.0; //rimetti tf 1.5
+	double ti=0.0, tf=0.3, t=0.0; //rimetti tf 1.5
 	
 	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
 
@@ -1561,11 +1897,12 @@ int main(int argc, char **argv){
 				capture_point_file<<cpx<<" "<<cpy<<"\n";
 				capture_point_file.flush();
 				
-				if((cpx > x_sup-0.02 || cpy > y_sup-0.03)&&coo_ee_fr(1)>0.001)
+				if((cpx > x_sup-0.02 || cpy > y_sup-0.035)&&coo_ee_fr(1)>0.001)
 				{	
 					cpok = false;
 					cpx = com_pos(0)+com_vel(0)/w;
 					cpy = com_pos(1)+com_vel(1)/w;
+					
 					Eigen::Matrix<double,3,3> Tbr= doggo->getBRworldtransform();
 					Eigen::Matrix<double,3,3> Tbl= doggo->getBLworldtransform();
 					Eigen::Matrix<double,3,3> Tfl= doggo->getFLworldtransform();
@@ -1575,6 +1912,9 @@ int main(int argc, char **argv){
 					force_bl = Tbl * eef_bl;
 					force_fr = Tfr * eef_fr;
 					force_fl = Tfl * eef_fl;
+					
+					cout<<"cpx: "<<cpx<<endl;
+					cout<<"cpy: "<<cpy<<endl;
 					
 					float copx = (force_bl(2) * coo_ee_bl(0) + force_br(2) * coo_ee_br(0) + force_fr(2) * coo_ee_fr(0) + force_fl(2) * coo_ee_fl(0))/(force_bl(2)+force_br(2)+force_fr(2)+force_fl(2));
 					float copy = (force_bl(2) * coo_ee_bl(1) + force_br(2) * coo_ee_br(1) + force_fr(2) * coo_ee_fr(1) + force_fl(2) * coo_ee_fl(1))/(force_bl(2)+force_br(2)+force_fr(2)+force_fl(2));
@@ -1664,7 +2004,7 @@ int main(int argc, char **argv){
 	}
 	
 		cout<<"cpok: "<<cpok<<endl;
-		if(cpok==true)//memo rimetti la condizione uguale a false 
+		if(cpok==false)//memo rimetti la condizione uguale a false 
 		{
 				doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 			
@@ -1699,22 +2039,33 @@ int main(int argc, char **argv){
 					int movimento=5;
 
 					if (movimento == 1){//muovo solo br
-						formulation=computetrajecotry(2);
+						formulation=computetrajecotry(1);
 						begin0 = ros::Time::now();	
 						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]);
 						swing_phasebr(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0]+formulation.params_.ee_phase_durations_.at(1)[1] , formulation.params_.ee_phase_durations_.at(1)[0]);
 						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);
 					}
 					else if (movimento == 2){ //muovo br e fl (trot)
+						
 						formulation=computetrajecotry(2);
 						
 						// initial simulation time 
 						begin0 = ros::Time::now();
 						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]);
 						swing_phase(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0]+formulation.params_.ee_phase_durations_.at(1)[1] , formulation.params_.ee_phase_durations_.at(1)[0]);
-						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);
+						//stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);
+						
+						//completo il trotto
+						formulation=computetrajecotry(7);
+						
+						// initial simulation time 
+						begin0 = ros::Time::now();
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(0)[0]);
+						swing_phase2(loop_rate,formulation.params_.ee_phase_durations_.at(0)[0]+formulation.params_.ee_phase_durations_.at(0)[1], formulation.params_.ee_phase_durations_.at(0)[0]);
+						stand_phase(loop_rate, formulation.params_.ee_phase_durations_.at(0)[0]+formulation.params_.ee_phase_durations_.at(0)[1]+ formulation.params_.ee_phase_durations_.at(0)[2]);
+						
 					}
-					else if (movimento == 3){ //muovo br e fr (bound)
+					else if (movimento == 3){ //muovo br e fr (pace)
 						formulation=computetrajecotry(3);
 						// initial simulation time 
 						begin0 = ros::Time::now();
@@ -1722,7 +2073,7 @@ int main(int argc, char **argv){
 						swing_phase_p(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0]+formulation.params_.ee_phase_durations_.at(1)[1] , formulation.params_.ee_phase_durations_.at(1)[0]);
 						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);
 						//riporto il dogbot nella posizione nominale
-						formulation=computetrajecotry(4);
+						formulation=computetrajecotry(4); //pace bl e fl
 						// initial simulation time 
 						begin0 = ros::Time::now();
 						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(0)[0]);
@@ -1730,16 +2081,22 @@ int main(int argc, char **argv){
 						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(0)[0]+ formulation.params_.ee_phase_durations_.at(0)[1] + formulation.params_.ee_phase_durations_.at(0)[2]);
 					}
 					else if (movimento == 5){
-						cout<<"if2"<<endl;
-						formulation=computetrajecotry(5);
-						cout<<"if3"<<endl;
+						
+						formulation=computetrajecotry(5);//bound fr e fl
+						
 						// initial simulation time 
 						begin0 = ros::Time::now();
 						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(2)[0]);
-						cout<<"if4"<<endl;
 						swing_phase_b(loop_rate, formulation.params_.ee_phase_durations_.at(2)[0]+formulation.params_.ee_phase_durations_.at(2)[1] , formulation.params_.ee_phase_durations_.at(2)[0]);
-						cout<<"if5"<<endl;
-						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(2)[0]+ formulation.params_.ee_phase_durations_.at(2)[1] + formulation.params_.ee_phase_durations_.at(2)[2]);
+						//stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(2)[0]+ formulation.params_.ee_phase_durations_.at(2)[1] + formulation.params_.ee_phase_durations_.at(2)[2]);
+						
+						//riporto il dogbot nella posizione nominale
+						formulation=computetrajecotry(6);//bound br e bl
+						// initial simulation time
+						begin0 = ros::Time::now();
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]);
+						swing_phase_b2(loop_rate, formulation.params_.ee_phase_durations_.at(1)[0]+formulation.params_.ee_phase_durations_.at(1)[1] , formulation.params_.ee_phase_durations_.at(1)[0]);
+						stand_phase(loop_rate,formulation.params_.ee_phase_durations_.at(1)[0]+ formulation.params_.ee_phase_durations_.at(1)[1] + formulation.params_.ee_phase_durations_.at(1)[2]);					
 					}
 					if(pauseGazebo.call(pauseSrv))
         				ROS_INFO("Simulation paused.");
