@@ -253,7 +253,8 @@ void stand_phase( ros::Rate loop_rate, double duration )
 { while((ros::Time::now()-begin0).toSec() < duration)
    if (joint_state_available && joint_base_available)
       {  
-        
+        tempo_simulazione_file<<ts<<"\n";
+		tempo_simulazione_file.flush();
         // Update robot
           
          doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
@@ -309,8 +310,13 @@ void stand_phase( ros::Rate loop_rate, double duration )
       for(int i=0; i<12; i++)
       {
    
-        tau1_msg.data.push_back(ta[i]);
+        
+		tau_file<<tau[i]<<" ";
+   		tau1_msg.data.push_back(ta[i]);
        }
+			tau_file<<"\n";
+			tau_file.flush();
+       
 
        //Sending command
         _tau_pub.publish(tau1_msg);
@@ -970,11 +976,9 @@ void swing_phase_p( ros::Rate loop_rate, double duration , double duration_prev)
        	//markerMsg.set_id(2);
 
       	if (joint_state_available && joint_base_available)
-      	{	/*markerMsg.set_id(6);
-      		markerMsg.set_action(ignition::msgs::Marker::ADD_MODIFY);
-    		markerMsg.set_type(ignition::msgs::Marker::TRIANGLE_FAN);
-          	markerMsg.clear_point();
-			*/
+      	{	
+			tempo_simulazione_file<<ts<<"\n";
+			tempo_simulazione_file.flush();
         	Eigen::VectorXd posfoot=Eigen::VectorXd::Zero(3);
 
 			// Update robot
@@ -1074,10 +1078,12 @@ void swing_phase_p( ros::Rate loop_rate, double duration , double duration_prev)
 
       		// Fill Command message
       		for(int i=0; i<12; i++)
-      		{
+      		{	
+				tau_file<<tau[i]<<" ";
    				tau1_msg.data.push_back(ta[i]);
        		}
-
+			tau_file<<"\n";
+			tau_file.flush();
        		//Sending command
         	_tau_pub.publish(tau1_msg);
 
@@ -1133,6 +1139,8 @@ void swing_phase_p2( ros::Rate loop_rate, double duration , double duration_prev
     		markerMsg.set_type(ignition::msgs::Marker::TRIANGLE_FAN);
           	markerMsg.clear_point();
 			*/
+			tempo_simulazione_file<<ts<<"\n";
+			tempo_simulazione_file.flush();
         	Eigen::VectorXd posfoot=Eigen::VectorXd::Zero(3);
 
 			// Update robot
@@ -1233,9 +1241,11 @@ void swing_phase_p2( ros::Rate loop_rate, double duration , double duration_prev
       		// Fill Command message
       		for(int i=0; i<12; i++)
       		{
+				tau_file<<tau[i]<<" ";
    				tau1_msg.data.push_back(ta[i]);
        		}
-
+			tau_file<<"\n";
+			tau_file.flush();
        		//Sending command
         	_tau_pub.publish(tau1_msg);
 
@@ -1510,14 +1520,32 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
   formulation_.initial_base_.lin.at(towr::kVel) << doggo->getCOMvel().block(0,0,3,1);
   formulation_.initial_base_.ang.at(towr::kVel) << doggo->getCOMvel().block(3,0,3,1);
 
-
+	Eigen::Matrix<double,3,1> posFr, posFl, posBr, posBl;
+	posFr = doggo->getFRpos();
+	posFl = doggo->getFLpos();
+	posBr = doggo->getBRpos();
+	posBl = doggo->getBLpos();
   
   //else if((ros::Time::now()).toSec()<5){
 	  												//0.2,0,0;
    // formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1]-0.05, 0.40229;
     //formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
  // }
- 	if(gait_flag<4){
+ 	if(gait_flag==1){
+		//formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0.0;//dopo rimetti formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0
+		//formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+		formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0, 0.0;
+		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+	}
+	if(gait_flag==2){
+		posFl = doggo->getFLpos();
+		posBr = doggo->getBRpos();
+		//formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0.0;//dopo rimetti formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0
+		//formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+		formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[0]-0.03, formulation_.initial_base_.lin.at(towr::kPos)[1]+0.04, 0.0;
+		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+	}
+	if(gait_flag==3){
 		//formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0.0;//dopo rimetti formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0
 		//formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
 		formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[1]+0.05, 0, 0.0;
@@ -1540,8 +1568,15 @@ towr::NlpFormulation computetrajecotry(int gait_flag)
 		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
 	}
 	if(gait_flag==7){
-		formulation_.final_base_.lin.at(towr::kPos) << 0.0, formulation_.initial_base_.lin.at(towr::kPos)[1], 0.0;
+		posFr = doggo->getFRpos();
+		posBl = doggo->getBLpos();
+		posFl = doggo->getFLpos();
+		posBr = doggo->getBRpos();
+		formulation_.final_base_.lin.at(towr::kPos) << formulation_.initial_base_.lin.at(towr::kPos)[0], formulation_.initial_base_.lin.at(towr::kPos)[1], 0.0;
 		formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
+
+		//formulation_.final_base_.lin.at(towr::kPos) << (posBr(0)+posFl(0))/2, (posBr(1)+posFl(1))/2, 0.0; //, (posBr(1)+posFl(1))/2, 0.0;
+		//formulation_.final_base_.ang.at(towr::kPos) << 0.0, -0.0, 0.0;
 	}
 
    auto nominal_stance_B = formulation_.model_.kinematic_model_->GetNominalStanceInBase();
@@ -1795,7 +1830,7 @@ int main(int argc, char **argv){
 	doggo->update(world_H_base, q_joints, dq_joints, basevel, gravity1);
 	
 	//traiettoria
-	double ti=0.0, tf=0.3, t=0.0; //rimetti tf 1.5
+	double ti=0.0, tf=0.7, t=0.0; //rimetti tf 1.5
 	
 	Matrix<double,6,1> init_pos, end_pos, init_vel, end_vel, init_acc, end_acc;
 
@@ -1897,7 +1932,7 @@ int main(int argc, char **argv){
 				capture_point_file<<cpx<<" "<<cpy<<"\n";
 				capture_point_file.flush();
 				
-				if((cpx > x_sup-0.02 || cpy > y_sup-0.035)&&coo_ee_fr(1)>0.001)
+				if((cpx > x_sup-0.02 || cpy > y_sup-0.035)&&coo_ee_fr(1)>0.001)//-0-02 e -0.035
 				{	
 					cpok = false;
 					cpx = com_pos(0)+com_vel(0)/w;
@@ -1964,29 +1999,46 @@ int main(int argc, char **argv){
 				// Set command message
 				tau1_msg.data.clear();
 				std::vector<double> ta(12,0.0);
+				if(cpok==true){
+					// torques in right order
+					ta[11]=tau(7);
+					ta[10]=tau(6);
+					ta[9]=tau(2);
+					ta[8]=tau(5);
+					ta[7]=tau(4);
+					ta[6]=tau(3);
+					ta[5]=tau(9);
+					ta[4]=tau(8);
+					ta[3]=tau(1);
+					ta[2]=tau(11);
+					ta[1]=tau(10);
+					ta[0]=tau(0);
+				}
 
-				// torques in right order
-				ta[11]=tau(7);
-				ta[10]=tau(6);
-				ta[9]=tau(2);
-				ta[8]=tau(5);
-				ta[7]=tau(4);
-				ta[6]=tau(3);
-				ta[5]=tau(9);
-				ta[4]=tau(8);
-				ta[3]=tau(1);
-				ta[2]=tau(11);
-				ta[1]=tau(10);
-				ta[0]=tau(0);
-
+					/*if(cpok==false){
+					// torques in right order
+					ta[11]=0;
+					ta[10]=0;
+					ta[9]=0;
+					ta[8]=0;
+					ta[7]=0;
+					ta[6]=0;
+					ta[5]=0;
+					ta[4]=0;
+					ta[3]=0;
+					ta[2]=0;
+					ta[1]=0;
+					ta[0]=0;
+				}*/
 
 				// Fill Command message
 				for(int i=0; i<12; i++)
 				{
-			
+					tau_file<<tau[i]<<" ";
 					tau1_msg.data.push_back(ta[i]);
 				}
-
+				tau_file<<"\n";
+				tau_file.flush();
 				//Sending command
 					_tau_pub.publish(tau1_msg);
 				
@@ -2036,7 +2088,7 @@ int main(int argc, char **argv){
 				//while((ros::Time::now()-begin0).toSec() < t_fin2-0.001)// && (!contact_br))//rimetti fr al posto di fl !contact_fl && !contact_br
 				//{	
 					
-					int movimento=5;
+					int movimento=3;
 
 					if (movimento == 1){//muovo solo br
 						formulation=computetrajecotry(1);
